@@ -43,5 +43,6 @@ services:
     ipc: host
 
 networks:
-  default:
-    name: vllm-net
+  vllm-net:
+    attachable: true
+

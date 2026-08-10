@@ -27,13 +27,18 @@ Create a `.env` file in the same directory as `docker-compose.yml`:
 
 ```env
 HF_TOKEN=hf_your_token_here
-
-# Reverse proxy (optional — required for HTTPS/DuckDNS)
-VIRTUAL_HOST=my-domain.duckdns.org
-LETSENCRYPT_EMAIL=you@example.com
 ```
 
 > The token must **never** be hardcoded in docker-compose or the entrypoint.
+
+For remote HTTPS access, also add:
+
+```env
+LETSENCRYPT_DOMAIN=my-domain.duckdns.org
+LETSENCRYPT_EMAIL=you@example.com
+```
+
+> `.env` is listed in `.gitignore` — never commit it.
 
 ### 2. Build and start
 
@@ -52,9 +57,10 @@ To expose the API over HTTPS through a DuckDNS domain, start with the proxy over
 docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
 ```
 
-This starts two additional containers:
-- **nginx** — vanilla reverse proxy on ports 80/443 with SSL hardening
-- **acme-companion** — auto-provisions and renews a free Let's Encrypt certificate
+This starts additional containers:
+- **docker-gen** — required by acme-companion (watches Docker events, no-op template)
+- **nginx** — vanilla reverse proxy on ports 80/443 with SSL hardening; generates a self-signed placeholder on first boot, then symlinks to the Let's Encrypt cert once issued
+- **acme-companion** — auto-provisions and renews a free Let's Encrypt certificate for `LETSENCRYPT_DOMAIN`
 
 On the first run, certificate issuance takes ~2 minutes. Check progress:
 
@@ -66,11 +72,9 @@ Once the certificate is ready, access the API at `https://<your-domain.duckdns.o
 
 > **Without the proxy overlay**, the API is exposed directly on `localhost:1235` (HTTP, local only).
 
-### 3. Get your API key (optional)
+### 3. Get your API key
 
-API authentication is **disabled by default**. To enable it, set `ENABLE_API_KEY=true` in `docker-compose.yml`.
-
-On the first run with API key enabled, the entrypoint generates a key and prints it to the logs:
+API authentication is **enabled by default** (`ENABLE_API_KEY=true`). On the first run, the entrypoint generates a key and prints it to the logs:
 
 ```bash
 docker compose logs | grep "Generated API key"
@@ -79,8 +83,10 @@ docker compose logs | grep "Generated API key"
 Save this value — it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
 
 ```bash
-cat /root/.vllm-key/.api_key
+docker exec vllm-server cat /root/.vllm-key/.api_key
 ```
+
+To disable authentication, set `ENABLE_API_KEY=false` in `docker-compose.yml`.
 
 ### 4. Verify
 
@@ -90,10 +96,11 @@ cat /root/.vllm-key/.api_key
 curl http://localhost:1235/v1/models
 ```
 
-**Proxy mode (with `--profile proxy`):**
+**Proxy mode (with overlay):**
 
 ```bash
-curl https://<your-domain.duckdns.org>/v1/models
+curl -k https://<your-domain>/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 You should see the model in the list.
@@ -101,8 +108,20 @@ You should see the model in the list.
 ## Usage (OpenAI-compatible API)
 
 ```bash
+# Direct mode
 curl http://localhost:1235/v1/chat/completions \
-  -H "Authorization: Bearer YOUR_API_KEY" \  # required if ENABLE_API_KEY=true
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "nvidia/Qwen3.6-27B-NVFP4",
+    "messages": [
+      {"role": "user", "content": "Hello, who are you?"}
+    ]
+  }'
+
+# Proxy mode (HTTPS)
+curl -k https://<your-domain>/v1/chat/completions \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "model": "nvidia/Qwen3.6-27B-NVFP4",
@@ -112,19 +131,7 @@ curl http://localhost:1235/v1/chat/completions \
   }'
 ```
 
-Or use the `openai` library pointing to `http://localhost:1235`:
-
-```python
-from openai import OpenAI
-
-# api_key="YOUR_API_KEY" if ENABLE_API_KEY=true, otherwise "not-needed"
-client = OpenAI(base_url="http://localhost:1235", api_key="not-needed")
-response = client.chat.completions.create(
-    model="nvidia/Qwen3.6-27B-NVFP4",
-    messages=[{"role": "user", "content": "Hello"}]
-)
-print(response.choices[0].message.content)
-```
+> Use `-k` (insecure) on first boot before Let's Encrypt issues the cert (self-signed placeholder). Remove `-k` once the cert is active.
 
 ## Configurable Parameters
 
@@ -147,15 +154,16 @@ All parameters are in `docker-compose.yml` under `environment`:
 
 ## Notes
 
-- **API Key:** disabled by default. Set `ENABLE_API_KEY=true` in `docker-compose.yml` to enable. On first run, an `sk-<uuid>` is auto-generated and saved to `/root/.vllm-key/.api_key` (bind-mounted to the host). Pass it via `Authorization: Bearer <key>` on every request. To override the auto-generated key, set `VLLM_API_KEY` in your environment — the entrypoint will use that instead.
+- **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to `/root/.vllm-key/.api_key` (bind-mounted to the host). Retrieve it with `docker exec vllm-server cat /root/.vllm-key/.api_key`. To override, set `VLLM_API_KEY` in your environment. To disable, set `ENABLE_API_KEY=false`.
 - **MTP (Multi-Token Prediction):** the `nvidia/Qwen3.6-27B-NVFP4` checkpoint includes up to 2 MTP layers. If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.8 GB. Do not increase further.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on `localhost:1235` (mapped from internal port 8000).
-- **Reverse Proxy:** two mutually exclusive modes:
+- **Reverse Proxy:** two modes via overlay:
   - **Direct** (default): `docker compose up -d` → API on `localhost:1235` (HTTP, local only)
   - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
-  - When proxy mode is active, ports 80/443 are exposed and the Let's Encrypt certificate is auto-issued for `LETSENCRYPT_DOMAIN`. The vllm container remains reachable on port 1235 as well — to disable it, comment out the `ports` section in `docker-compose.yml`.
+  - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
+  - When proxy mode is active, ports 80/443 are exposed. The vllm container remains reachable on port 1235 as well — to disable it, comment out the `ports` section in `docker-compose.yml`.
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 
