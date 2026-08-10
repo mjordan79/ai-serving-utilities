@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 API_KEY_FILE="/root/.vllm-key/.api_key"
@@ -7,10 +7,10 @@ if [ -n "$HF_TOKEN" ]; then
   export HF_TOKEN
 fi
 
-# API key: abilita con ENABLE_API_KEY=true.
-# Se abilitata e non esiste, genera un UUID persistente.
-# Se abilitata e esiste, riutilizza il token salvato.
-# Se disabilitata, nessuna autenticazione (dev locale).
+# API key: enable with ENABLE_API_KEY=true.
+# If enabled and it doesn't exist, generate a persistent UUID.
+# If enabled and it exists, reuse the saved token.
+# If disabled, no authentication (dev local).
 API_KEY_ARGS=()
 if [ "${ENABLE_API_KEY:-false}" = "true" ]; then
   if [ -z "$VLLM_API_KEY" ]; then

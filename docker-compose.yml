@@ -12,7 +12,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1          # 1 GPU, come da requisito
+              count: 1
               capabilities: [gpu]
 
     environment:
@@ -20,17 +20,16 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MODEL_NAME=nvidia/Qwen3.6-27B-NVFP4
       - TP_SIZE=1
-      # Valori prudenti per 32GB di VRAM (RTX 5090).
       - MAX_MODEL_LEN=180800
       - MAX_NUM_SEQS=1
       - MAX_NUM_BATCHED_TOKENS=6144
       - GPU_MEMORY_UTILIZATION=0.94
-      # Metti a "false" se al primo avvio l'MTP fallisce per pesi mancanti
-      # (vedi nota in entrypoint.sh: non confermato per questo checkpoint).
+      # Set to "false" if MTP fails due to missing weights
       - ENABLE_MTP=true
+      # Do you need to an API key protecting this model? (Read the README for more details)
       - ENABLE_API_KEY=true
       - ENABLE_REQUEST_METRICS=false
-      # Il valore vero va messo in un file .env (vedi sotto), non qui.
+      # The HuggingFace token should be placed in the .env file
       - HF_TOKEN=${HF_TOKEN}
 
     volumes:

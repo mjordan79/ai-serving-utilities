@@ -1,6 +1,6 @@
 FROM vllm/vllm-openai:nightly
 
-# Serve per installare pacchetti che richiedono localizzazione.
+# Needed for packages that require localization.
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Rome
 
