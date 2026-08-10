@@ -1,4 +1,6 @@
-# Qwen3.6-27B-NVFP4 — vLLM Server
+# NVIDIA Qwen3.6-27B-NVFP4 — vLLM Server
+
+![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Alibaba Cloud](https://img.shields.io/badge/Alibaba%20Cloud-FF6A00?style=for-the-badge&logo=alibabacloud&logoColor=white) ![vLLM](https://img.shields.io/badge/vLLM-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 Docker Compose deployment for `nvidia/Qwen3.6-27B-NVFP4` on vLLM (OpenAI-compatible API).
 
