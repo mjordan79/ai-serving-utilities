@@ -44,7 +44,7 @@ exec vllm serve "$MODEL_NAME" \
   --dtype auto \
   --safetensors-load-strategy=prefetch \
   --tensor-parallel-size "${TP_SIZE:-1}" \
-  --attention-backend triton_attn \
+  --attention-backend flashinfer \
   --performance-mode interactivity \
   --language-model-only \
   --skip-mm-profiling \
