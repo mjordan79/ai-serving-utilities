@@ -1,4 +1,4 @@
-# IA Serving Utilities
+# AI Serving Utilities
 
 Docker-based deployment utilities for running AI models across multiple serving runtimes.
 
