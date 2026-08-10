@@ -170,11 +170,23 @@ All parameters are in `docker-compose.yml` under `environment`:
 ## Useful Commands
 
 ```bash
+# Start (direct mode — localhost:1235 only)
+docker compose up -d
+
+# Start with HTTPS proxy (remote access via DuckDNS)
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
+
 # Real-time logs
 docker compose logs -f
 
-# Stop
+# Proxy logs (acme-companion certificate status)
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme-companion
+
+# Stop (direct mode)
 docker compose down
+
+# Stop (proxy mode)
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml down
 
 # Stop and remove volumes (re-downloads model on next start)
 docker compose down -v
