@@ -1,0 +1,61 @@
+# Reverse Proxy + HTTPS overlay
+# Usage: docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
+
+services:
+  vllm:
+    # Pass Let's Encrypt vars to vllm (read by acme-companion via Docker socket)
+    environment:
+      - LETSENCRYPT_HOST=${LETSENCRYPT_DOMAIN:-}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-}
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: vllm-nginx
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - nginx-certs:/etc/nginx/certs:ro
+      - nginx-html:/usr/share/nginx/html
+
+    depends_on:
+      vllm:
+        condition: service_healthy
+
+  acme-companion:
+    image: nginxproxy/acme-companion:2
+    container_name: vllm-acme
+    restart: unless-stopped
+
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - nginx-certs:/etc/nginx/certs
+      - nginx-html:/usr/share/nginx/html
+      - acme-data:/etc/acme.sh
+
+    environment:
+      - NGINX_PROXY_CONTAINER=vllm-nginx
+      - DEFAULT_EMAIL=${LETSENCRYPT_EMAIL:-}
+
+    depends_on:
+      - nginx
+
+networks:
+  default:
+    name: vllm-net
+
+volumes:
+  nginx-certs:
+  nginx-html:
+  acme-data:

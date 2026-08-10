@@ -13,6 +13,12 @@ by Renato Perini (mjordan79)
 - **Docker** + **Docker Compose**
 - **HuggingFace token** with access to `nvidia/Qwen3.6-27B-NVFP4`
 
+### For remote access via HTTPS (optional)
+
+- **DuckDNS account** with a subdomain (e.g., `my-model.duckdns.org`) — free, up to 5 subdomains
+- **Ports 80 and 443** forwarded from your router to the Docker host
+- DuckDNS subdomain pointing to your public IP (update at [duckdns.org](https://www.duckdns.org))
+
 ## Setup
 
 ### 1. Configure the HuggingFace token
@@ -21,6 +27,10 @@ Create a `.env` file in the same directory as `docker-compose.yml`:
 
 ```env
 HF_TOKEN=hf_your_token_here
+
+# Reverse proxy (optional — required for HTTPS/DuckDNS)
+VIRTUAL_HOST=my-domain.duckdns.org
+LETSENCRYPT_EMAIL=you@example.com
 ```
 
 > The token must **never** be hardcoded in docker-compose or the entrypoint.
@@ -33,6 +43,28 @@ docker compose up -d
 ```
 
 The first run downloads the model (~15 GB) and stores it in the HuggingFace cache mounted at `/root/.cache/huggingface`.
+
+### 2b. Remote access via HTTPS (optional)
+
+To expose the API over HTTPS through a DuckDNS domain, start with the proxy overlay:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
+```
+
+This starts two additional containers:
+- **nginx** — vanilla reverse proxy on ports 80/443 with SSL hardening
+- **acme-companion** — auto-provisions and renews a free Let's Encrypt certificate
+
+On the first run, certificate issuance takes ~2 minutes. Check progress:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme-companion
+```
+
+Once the certificate is ready, access the API at `https://<your-domain.duckdns.org>`.
+
+> **Without the proxy overlay**, the API is exposed directly on `localhost:1235` (HTTP, local only).
 
 ### 3. Get your API key (optional)
 
@@ -52,8 +84,16 @@ cat /root/.vllm-key/.api_key
 
 ### 4. Verify
 
+**Direct mode (default):**
+
 ```bash
 curl http://localhost:1235/v1/models
+```
+
+**Proxy mode (with `--profile proxy`):**
+
+```bash
+curl https://<your-domain.duckdns.org>/v1/models
 ```
 
 You should see the model in the list.
@@ -102,6 +142,8 @@ All parameters are in `docker-compose.yml` under `environment`:
 | `ENABLE_API_KEY` | `false` | API key authentication (auto-generates on first run) |
 | `ENABLE_REQUEST_METRICS` | `false` | Per-request metrics (profiling) |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
+| `LETSENCRYPT_DOMAIN` | *(none)* | Domain for Let's Encrypt certificate (e.g., `my-domain.duckdns.org`) |
+| `LETSENCRYPT_EMAIL` | *(none)* | Email for Let's Encrypt certificate notifications |
 
 ## Notes
 
@@ -110,6 +152,12 @@ All parameters are in `docker-compose.yml` under `environment`:
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.8 GB. Do not increase further.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on `localhost:1235` (mapped from internal port 8000).
+- **Reverse Proxy:** two mutually exclusive modes:
+  - **Direct** (default): `docker compose up -d` → API on `localhost:1235` (HTTP, local only)
+  - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
+  - When proxy mode is active, ports 80/443 are exposed and the Let's Encrypt certificate is auto-issued for `LETSENCRYPT_DOMAIN`. The vllm container remains reachable on port 1235 as well — to disable it, comment out the `ports` section in `docker-compose.yml`.
+- **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
+- **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 
 ## Useful Commands
 
