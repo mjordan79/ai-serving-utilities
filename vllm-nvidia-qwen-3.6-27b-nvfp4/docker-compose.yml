@@ -33,8 +33,8 @@ services:
       - HF_TOKEN=${HF_TOKEN}
 
     volumes:
-      - /root/.cache/huggingface:/root/.cache/huggingface
-      - /root/.vllm-key:/root/.vllm-key
+      - hf-cache:/root/.cache/huggingface
+      - vllm-keys:/root/.vllm-key
 
     ports:
       - "1235:8000"
@@ -46,3 +46,6 @@ networks:
   vllm-net:
     attachable: true
 
+volumes:
+  hf-cache:
+  vllm-keys:
