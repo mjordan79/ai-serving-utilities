@@ -141,13 +141,13 @@ All parameters are in `docker-compose.yml` under `environment`:
 |---|---|---|
 | `MODEL_NAME` | `nvidia/Qwen3.6-27B-NVFP4` | HuggingFace model name |
 | `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
-| `MAX_MODEL_LEN` | `180800` | Maximum context length (tokens) |
+| `MAX_MODEL_LEN` | `131072` | Maximum context length (128K tokens) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
-| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
-| `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding, 2 tokens) |
-| `ENABLE_API_KEY` | `false` | API key authentication (auto-generates on first run) |
-| `ENABLE_REQUEST_METRICS` | `false` | Per-request metrics (profiling) |
+| `GPU_MEMORY_UTILIZATION` | `0.92` | Fraction of usable VRAM (0.0–1.0) |
+| `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding, 3 tokens) |
+| `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
+| `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 | `LETSENCRYPT_DOMAIN` | *(none)* | Domain for Let's Encrypt certificate (e.g., `my-domain.duckdns.org`) |
 | `LETSENCRYPT_EMAIL` | *(none)* | Email for Let's Encrypt certificate notifications |
@@ -155,15 +155,15 @@ All parameters are in `docker-compose.yml` under `environment`:
 ## Notes
 
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to `/root/.vllm-key/.api_key` (bind-mounted to the host). Retrieve it with `docker exec vllm-server cat /root/.vllm-key/.api_key`. To override, set `VLLM_API_KEY` in your environment. To disable, set `ENABLE_API_KEY=false`.
-- **MTP (Multi-Token Prediction):** the `nvidia/Qwen3.6-27B-NVFP4` checkpoint includes up to 2 MTP layers. If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
-- **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.8 GB. Do not increase further.
+- **MTP (Multi-Token Prediction):** the `nvidia/Qwen3.6-27B-NVFP4` checkpoint includes up to 3 MTP layers. If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
+- **VRAM:** with `GPU_MEMORY_UTILIZATION=0.92` on 32 GB, consumption is ~29.4 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on `localhost:1235` (mapped from internal port 8000).
 - **Reverse Proxy:** two modes via overlay:
   - **Direct** (default): `docker compose up -d` → API on `localhost:1235` (HTTP, local only)
   - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
   - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
-  - When proxy mode is active, ports 80/443 are exposed. The vllm container remains reachable on port 1235 as well — to disable it, comment out the `ports` section in `docker-compose.yml`.
+  - When proxy mode is active, ports 80/443 are exposed and port 1235 is automatically disabled — all traffic routes through nginx.
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 
