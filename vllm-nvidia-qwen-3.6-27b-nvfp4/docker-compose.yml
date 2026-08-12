@@ -6,6 +6,9 @@ services:
 
     container_name: vllm-server
 
+    networks:
+      - vllm-net
+
     runtime: nvidia
     deploy:
       resources:
