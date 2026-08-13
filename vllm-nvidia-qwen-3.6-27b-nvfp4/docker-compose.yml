@@ -9,10 +9,10 @@ services:
 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 15s
+      interval: 60s
       timeout: 5s
       retries: 3
-      start_period: 480s
+      start_period: 600s
 
     networks:
       - vllm-net
@@ -32,7 +32,7 @@ services:
 
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - MODEL_NAME=nvidia/Qwen3.6-27B-NVFP4
+      - MODEL_NAME=${MODEL_NAME:-nvidia/Qwen3.6-27B-NVFP4}
       - ENABLE_API_KEY=true
       - DTYPE=auto
       - SAFETENSORS_LOAD_STRATEGY=prefetch
@@ -43,7 +43,7 @@ services:
       - SKIP_MM_PROFILING=true
       - KV_CACHE_DTYPE=fp8_e4m3
       - GPU_MEMORY_UTILIZATION=0.92
-      - MAX_MODEL_LEN=131072
+      - MAX_MODEL_LEN=${MAX_MODEL_LEN:-116800}
       - MAX_NUM_SEQS=1
       - MAX_NUM_BATCHED_TOKENS=6144
       - ENABLE_CHUNKED_PREFILL=true
@@ -53,9 +53,9 @@ services:
       - DEFAULT_ENABLE_THINKING=true
       - ENABLE_AUTO_TOOL_CHOICE=true
       - TOOL_CALL_PARSER=qwen3_coder
-      - QUANTIZATION=modelopt
+      - QUANTIZATION=${QUANTIZATION:-modelopt}
       - ENABLE_MTP=true
-      - MTP_NUM_SPECULATIVE_TOKENS=3
+      - MTP_NUM_SPECULATIVE_TOKENS=2
       - TRUST_REMOTE_CODE=true
       - ENABLE_PROMPT_TOKENS_DETAILS=true
       - ENABLE_REQUEST_METRICS=true
@@ -64,7 +64,7 @@ services:
       - HF_TOKEN=${HF_TOKEN}
 
     volumes:
-      - hf-cache:/root/.cache/huggingface
+      - ${HF_CACHE_VOLUME:-hf-cache-nvidia}:/root/.cache/huggingface
       - vllm-keys:/root/.vllm-key
 
     ports:
@@ -78,5 +78,6 @@ networks:
     attachable: true
 
 volumes:
-  hf-cache:
+  hf-cache-nvidia:
+  hf-cache-unsloth:
   vllm-keys:

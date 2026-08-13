@@ -141,11 +141,11 @@ All parameters are in `docker-compose.yml` under `environment`:
 |---|---|---|
 | `MODEL_NAME` | `nvidia/Qwen3.6-27B-NVFP4` | HuggingFace model name |
 | `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
-| `MAX_MODEL_LEN` | `131072` | Maximum context length (128K tokens) |
+| `MAX_MODEL_LEN` | `116800` | Maximum context length — set per variant in `.env` (NVIDIA: `131072`, Unsloth: `116800`) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
 | `GPU_MEMORY_UTILIZATION` | `0.92` | Fraction of usable VRAM (0.0–1.0) |
-| `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding, 3 tokens) |
+| `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding, 2 tokens) |
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
@@ -155,7 +155,7 @@ All parameters are in `docker-compose.yml` under `environment`:
 ## Notes
 
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to `/root/.vllm-key/.api_key` (bind-mounted to the host). Retrieve it with `docker exec vllm-server cat /root/.vllm-key/.api_key`. To override, set `VLLM_API_KEY` in your environment. To disable, set `ENABLE_API_KEY=false`.
-- **MTP (Multi-Token Prediction):** the `nvidia/Qwen3.6-27B-NVFP4` checkpoint includes up to 3 MTP layers. If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
+- **MTP (Multi-Token Prediction):** the `nvidia/Qwen3.6-27B-NVFP4` checkpoint includes up to 3 MTP layers. Default is 2 speculative tokens for better compute/accuracy balance (per-position acceptance rate ~60-70% at position 1-2 vs ~30-50% at position 3). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.92` on 32 GB, consumption is ~29.4 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on `localhost:1235` (mapped from internal port 8000).

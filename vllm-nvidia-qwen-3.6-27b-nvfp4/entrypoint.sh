@@ -39,8 +39,8 @@ TP_SIZE="${TP_SIZE:-1}"
 
 # Memory & Context
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.92}"
-# 128K native context window. Reduce to 116800 if OOM under heavy KV cache pressure.
-MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
+# Default 116K — conservative to avoid OOM. Increase to 131072 if VRAM allows.
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-116800}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 
 # Throughput
@@ -53,7 +53,7 @@ PERFORMANCE_MODE="${PERFORMANCE_MODE:-interactivity}"
 
 # Features
 ENABLE_MTP="${ENABLE_MTP:-true}"
-MTP_NUM_SPECULATIVE_TOKENS="${MTP_NUM_SPECULATIVE_TOKENS:-3}"
+MTP_NUM_SPECULATIVE_TOKENS="${MTP_NUM_SPECULATIVE_TOKENS:-2}"
 ENABLE_CHUNKED_PREFILL="${ENABLE_CHUNKED_PREFILL:-true}"
 ENABLE_PREFIX_CACHING="${ENABLE_PREFIX_CACHING:-true}"
 ENABLE_HYBRID_KV_CACHE_MANAGER="${ENABLE_HYBRID_KV_CACHE_MANAGER:-true}"
@@ -155,4 +155,5 @@ exec vllm serve "$MODEL_NAME" \
   "${TRUST_ARGS[@]}" \
   "${PROMPT_TOKENS_ARGS[@]}" \
   "${REQUEST_METRICS_ARGS[@]}" \
+  --uvicorn-log-level warning \
   --port "$PORT"
