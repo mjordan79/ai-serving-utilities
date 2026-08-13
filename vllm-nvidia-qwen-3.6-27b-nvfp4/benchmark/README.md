@@ -4,6 +4,10 @@ by Renato Perini (mjordan79)
 
 Curl-based benchmark suite for vLLM deployments. No Python, no external dependencies beyond `bash`, `curl`, `gawk`, `date`.
 
+## Visual Comparison Report
+
+![Benchmark Comparison: NVIDIA ModelOpt vs. Unsloth Compressed-Tensors](results/benchmark_comparison.svg)
+
 ## Structure
 
 ```

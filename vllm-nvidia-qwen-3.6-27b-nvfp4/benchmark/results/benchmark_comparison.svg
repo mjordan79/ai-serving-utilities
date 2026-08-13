@@ -1,0 +1,434 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 2330" width="1200" height="2330" font-family="'Segoe UI', Arial, Helvetica, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <filter id="shadow" x="-2%" y="-5%" width="104%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="2330" fill="url(#bg)"/>
+
+  <!-- ============================================ -->
+  <!-- HEADER SECTION                               -->
+  <!-- ============================================ -->
+  <g transform="translate(0,30)">
+    <text x="600" y="30" text-anchor="middle" font-size="32" font-weight="bold" fill="#f1f5f9">Benchmark Comparison Report</text>
+    <text x="600" y="58" text-anchor="middle" font-size="18" fill="#94a3b8">Qwen3.6-27B-NVFP4 · vLLM Inference</text>
+    <text x="600" y="82" text-anchor="middle" font-size="14" fill="#64748b">2026-08-13 · 3 iterations averaged</text>
+
+    <!-- NVIDIA Logo (left) -->
+    <g transform="translate(100,110)" filter="url(#shadow)">
+      <rect x="0" y="0" width="280" height="90" rx="10" fill="#1e293b" stroke="#76b900" stroke-width="2"/>
+      <text x="140" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#76b900" letter-spacing="2">NVIDIA</text>
+      <text x="140" y="65" text-anchor="middle" font-size="14" fill="#94a3b8">ModelOpt</text>
+      <text x="140" y="82" text-anchor="middle" font-size="11" fill="#64748b">nvidia/Qwen3.6-27B-NVFP4</text>
+    </g>
+
+    <!-- VS Badge (center) -->
+    <g transform="translate(600,155)">
+      <circle cx="0" cy="0" r="30" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+      <text x="0" y="8" text-anchor="middle" font-size="20" font-weight="bold" fill="#e2e8f0">VS</text>
+    </g>
+
+    <!-- Unsloth Logo (right) -->
+    <g transform="translate(820,110)" filter="url(#shadow)">
+      <rect x="0" y="0" width="280" height="90" rx="10" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+      <text x="140" y="38" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#f97316">Unsloth</text>
+      <text x="140" y="65" text-anchor="middle" font-size="14" fill="#94a3b8">Compressed-Tensors</text>
+      <text x="140" y="82" text-anchor="middle" font-size="11" fill="#64748b">unsloth/Qwen3.6-27B-NVFP4</text>
+    </g>
+
+    <!-- Qwen Logo (bottom center) -->
+    <g transform="translate(600,230)">
+      <circle cx="0" cy="0" r="24" fill="#1e293b" stroke="#3b82f6" stroke-width="2"/>
+      <text x="0" y="8" text-anchor="middle" font-size="20" font-weight="bold" fill="#3b82f6">Q</text>
+      <text x="36" y="6" font-size="16" font-weight="bold" fill="#e2e8f0">Qwen3.6-27B-NVFP4</text>
+    </g>
+  </g>
+
+  <!-- Divider -->
+  <line x1="80" y1="340" x2="1120" y2="340" stroke="#334155" stroke-width="2"/>
+
+  <!-- ============================================ -->
+  <!-- SECTION 1: TTFT Comparison (stacked bars)    -->
+  <!-- ============================================ -->
+  <g transform="translate(0,390)">
+    <text x="600" y="0" text-anchor="middle" font-size="20" font-weight="bold" fill="#f1f5f9">Time To First Token (TTFT) — Lower is Better ✓</text>
+    <text x="600" y="20" text-anchor="middle" font-size="12" fill="#64748b">Stacked bars: NVIDIA (green, top) vs Unsloth (orange, bottom) · Scale: 0–900ms</text>
+
+    <!-- Legend -->
+    <g transform="translate(80,40)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="20" y="12" font-size="11" fill="#94a3b8">NVIDIA ModelOpt</text>
+      <rect x="180" y="0" width="14" height="14" rx="3" fill="#f97316"/>
+      <text x="200" y="12" font-size="11" fill="#94a3b8">Unsloth Compressed-Tensors</text>
+    </g>
+
+    <!-- simple_chat: N=149ms, U=116ms -->
+    <g transform="translate(80,80)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">simple_chat</text>
+      <rect x="150" y="0" width="131" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="286" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">149ms</text>
+      <rect x="150" y="24" width="102" height="12" rx="3" fill="#f97316"/>
+      <text x="256" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">116ms ✓</text>
+      <text x="310" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-22%</text>
+    </g>
+
+    <!-- long_context: N=834ms, U=403ms -->
+    <g transform="translate(80,130)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">long_context</text>
+      <rect x="150" y="0" width="734" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="888" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">834ms</text>
+      <rect x="150" y="24" width="355" height="12" rx="3" fill="#f97316"/>
+      <text x="509" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">403ms ✓</text>
+      <text x="560" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-52%</text>
+    </g>
+
+    <!-- code_generation: N=134ms, U=111ms -->
+    <g transform="translate(80,180)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">code_generation</text>
+      <rect x="150" y="0" width="118" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="272" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">134ms</text>
+      <rect x="150" y="24" width="98" height="12" rx="3" fill="#f97316"/>
+      <text x="252" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">111ms ✓</text>
+      <text x="300" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-17%</text>
+    </g>
+
+    <!-- reasoning: N=163ms, U=108ms -->
+    <g transform="translate(80,230)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">reasoning</text>
+      <rect x="150" y="0" width="143" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="297" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">163ms</text>
+      <rect x="150" y="24" width="95" height="12" rx="3" fill="#f97316"/>
+      <text x="249" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">108ms ✓</text>
+      <text x="300" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-34%</text>
+    </g>
+
+    <!-- tool_calling: N=158ms, U=115ms -->
+    <g transform="translate(80,280)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">tool_calling</text>
+      <rect x="150" y="0" width="139" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="293" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">158ms</text>
+      <rect x="150" y="24" width="101" height="12" rx="3" fill="#f97316"/>
+      <text x="255" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">115ms ✓</text>
+      <text x="310" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-27%</text>
+    </g>
+
+    <!-- long_output: N=164ms, U=113ms -->
+    <g transform="translate(80,330)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">long_output</text>
+      <rect x="150" y="0" width="144" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="298" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">164ms</text>
+      <rect x="150" y="24" width="99" height="12" rx="3" fill="#f97316"/>
+      <text x="253" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">113ms ✓</text>
+      <text x="310" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-31%</text>
+    </g>
+
+    <!-- multi_turn: N=162ms, U=114ms -->
+    <g transform="translate(80,380)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">multi_turn (avg)</text>
+      <rect x="150" y="0" width="143" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="297" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">162ms</text>
+      <rect x="150" y="24" width="100" height="12" rx="3" fill="#f97316"/>
+      <text x="254" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">114ms ✓</text>
+      <text x="310" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-30%</text>
+    </g>
+
+    <!-- mixed_workload: N=167ms, U=109ms -->
+    <g transform="translate(80,430)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">mixed_workload (avg)</text>
+      <rect x="150" y="0" width="147" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="301" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">167ms</text>
+      <rect x="150" y="24" width="96" height="12" rx="3" fill="#f97316"/>
+      <text x="250" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">109ms ✓</text>
+      <text x="300" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">-35%</text>
+    </g>
+  </g>
+
+  <!-- Divider -->
+  <line x1="80" y1="880" x2="1120" y2="880" stroke="#334155" stroke-width="2"/>
+
+  <!-- ============================================ -->
+  <!-- SECTION 2: TPS Comparison (stacked bars)     -->
+  <!-- ============================================ -->
+  <g transform="translate(0,930)">
+    <text x="600" y="0" text-anchor="middle" font-size="20" font-weight="bold" fill="#f1f5f9">Tokens Per Second (TPS) — Higher is Better ✓</text>
+    <text x="600" y="20" text-anchor="middle" font-size="12" fill="#64748b">Stacked bars: NVIDIA (green, top) vs Unsloth (orange, bottom) · Scale: 0–120 TPS</text>
+
+    <!-- Legend -->
+    <g transform="translate(80,40)">
+      <rect x="0" y="0" width="14" height="14" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="20" y="12" font-size="11" fill="#94a3b8">NVIDIA ModelOpt</text>
+      <rect x="180" y="0" width="14" height="14" rx="3" fill="#f97316"/>
+      <text x="200" y="12" font-size="11" fill="#94a3b8">Unsloth Compressed-Tensors</text>
+    </g>
+
+    <!-- simple_chat: N=80.1, U=85.0 -->
+    <g transform="translate(80,80)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">simple_chat</text>
+      <rect x="150" y="0" width="534" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="688" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">80.1</text>
+      <rect x="150" y="24" width="567" height="12" rx="3" fill="#f97316"/>
+      <text x="720" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">85.0 ✓</text>
+      <text x="765" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">+6.1%</text>
+    </g>
+
+    <!-- long_context: N=57.6, U=75.1 -->
+    <g transform="translate(80,130)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">long_context</text>
+      <rect x="150" y="0" width="384" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="538" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">57.6</text>
+      <rect x="150" y="24" width="501" height="12" rx="3" fill="#f97316"/>
+      <text x="655" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">75.1 ✓</text>
+      <text x="700" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">+30.4%</text>
+    </g>
+
+    <!-- code_generation: N=93.9, U=98.8 -->
+    <g transform="translate(80,180)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">code_generation</text>
+      <rect x="150" y="0" width="628" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="782" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">93.9</text>
+      <rect x="150" y="24" width="660" height="12" rx="3" fill="#f97316"/>
+      <text x="814" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">98.8 ✓</text>
+      <text x="855" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">+5.2%</text>
+    </g>
+
+    <!-- reasoning: N=104.3, U=111.2 -->
+    <g transform="translate(80,230)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">reasoning</text>
+      <rect x="150" y="0" width="696" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="850" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">104.3</text>
+      <rect x="150" y="24" width="743" height="12" rx="3" fill="#f97316"/>
+      <text x="897" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">111.2 ✓</text>
+      <text x="940" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">+6.6%</text>
+    </g>
+
+    <!-- tool_calling: N=99.3, U=90.6 -->
+    <g transform="translate(80,280)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">tool_calling</text>
+      <rect x="150" y="0" width="663" height="12" rx="3" fill="#76b900"/>
+      <text x="817" y="10" font-size="11" fill="#76b900" font-weight="bold" dominant-baseline="middle">99.3 ✓</text>
+      <rect x="150" y="24" width="605" height="12" rx="3" fill="#f97316" opacity="0.7"/>
+      <text x="759" y="34" font-size="11" fill="#f97316" dominant-baseline="middle">90.6</text>
+      <text x="800" y="19" font-size="11" fill="#ef4444" font-weight="bold" dominant-baseline="middle">-8.8%</text>
+    </g>
+
+    <!-- long_output: N=87.9, U=92.0 -->
+    <g transform="translate(80,330)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">long_output</text>
+      <rect x="150" y="0" width="585" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="739" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">87.9</text>
+      <rect x="150" y="24" width="613" height="12" rx="3" fill="#f97316"/>
+      <text x="767" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">92.0 ✓</text>
+      <text x="810" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">+4.7%</text>
+    </g>
+
+    <!-- multi_turn: N=86.9, U=89.8 -->
+    <g transform="translate(80,380)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">multi_turn (avg)</text>
+      <rect x="150" y="0" width="580" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="734" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">86.9</text>
+      <rect x="150" y="24" width="598" height="12" rx="3" fill="#f97316"/>
+      <text x="752" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">89.8 ✓</text>
+      <text x="795" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">+3.3%</text>
+    </g>
+
+    <!-- mixed_workload: N=87.4, U=99.9 -->
+    <g transform="translate(80,430)">
+      <text x="0" y="10" font-size="12" fill="#94a3b8" dominant-baseline="middle">mixed_workload (avg)</text>
+      <rect x="150" y="0" width="583" height="12" rx="3" fill="#76b900" opacity="0.7"/>
+      <text x="737" y="10" font-size="11" fill="#76b900" dominant-baseline="middle">87.4</text>
+      <rect x="150" y="24" width="666" height="12" rx="3" fill="#f97316"/>
+      <text x="820" y="34" font-size="11" fill="#f97316" font-weight="bold" dominant-baseline="middle">99.9 ✓</text>
+      <text x="865" y="19" font-size="11" fill="#22c55e" font-weight="bold" dominant-baseline="middle">+14.3%</text>
+    </g>
+  </g>
+
+  <!-- Divider -->
+  <line x1="80" y1="1480" x2="1120" y2="1480" stroke="#334155" stroke-width="2"/>
+
+  <!-- ============================================ -->
+  <!-- SECTION 3: Winner Summary                    -->
+  <!-- ============================================ -->
+  <g transform="translate(0,1520)">
+    <!-- Winner Badge -->
+    <g transform="translate(600,30)" filter="url(#shadow)">
+      <rect x="-280" y="-25" width="560" height="70" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="3"/>
+      <text x="0" y="10" text-anchor="middle" font-size="28" font-weight="bold" fill="#f97316">UNSLOTH WINS</text>
+      <text x="0" y="35" text-anchor="middle" font-size="14" fill="#94a3b8">7/8 TTFT · 7/8 TPS · 6/6 Duration</text>
+    </g>
+
+    <!-- Score Cards -->
+    <!-- NVIDIA Card -->
+    <g transform="translate(100,140)" filter="url(#shadow)">
+      <rect x="0" y="0" width="480" height="220" rx="12" fill="#1e293b" stroke="#76b900" stroke-width="2"/>
+      <text x="240" y="35" text-anchor="middle" font-size="18" font-weight="bold" fill="#76b900">NVIDIA ModelOpt</text>
+
+      <g transform="translate(30,60)">
+        <text x="0" y="20" font-size="13" fill="#94a3b8">Avg TTFT</text>
+        <text x="300" y="20" font-size="16" font-weight="bold" fill="#e2e8f0">236 ms</text>
+
+        <text x="0" y="50" font-size="13" fill="#94a3b8">Avg TPS</text>
+        <text x="300" y="50" font-size="16" font-weight="bold" fill="#e2e8f0">87.4</text>
+
+        <text x="0" y="80" font-size="13" fill="#94a3b8">TTFT Wins</text>
+        <text x="300" y="80" font-size="16" font-weight="bold" fill="#e2e8f0">1 / 8</text>
+
+        <text x="0" y="110" font-size="13" fill="#94a3b8">TPS Wins</text>
+        <text x="300" y="110" font-size="16" font-weight="bold" fill="#e2e8f0">1 / 8</text>
+
+        <text x="0" y="140" font-size="13" fill="#94a3b8">Best In</text>
+        <text x="300" y="140" font-size="13" fill="#fbbf24">tool_calling TPS (99.3)</text>
+      </g>
+    </g>
+
+    <!-- Unsloth Card -->
+    <g transform="translate(620,140)" filter="url(#shadow)">
+      <rect x="0" y="0" width="480" height="220" rx="12" fill="#1e293b" stroke="#f97316" stroke-width="2"/>
+      <text x="240" y="35" text-anchor="middle" font-size="18" font-weight="bold" fill="#f97316">Unsloth Compressed-Tensors</text>
+
+      <g transform="translate(30,60)">
+        <text x="0" y="20" font-size="13" fill="#94a3b8">Avg TTFT</text>
+        <text x="300" y="20" font-size="16" font-weight="bold" fill="#f97316">152 ms ✓</text>
+
+        <text x="0" y="50" font-size="13" fill="#94a3b8">Avg TPS</text>
+        <text x="300" y="50" font-size="16" font-weight="bold" fill="#f97316">94.8 ✓</text>
+
+        <text x="0" y="80" font-size="13" fill="#94a3b8">TTFT Wins</text>
+        <text x="300" y="80" font-size="16" font-weight="bold" fill="#f97316">7 / 8 ✓</text>
+
+        <text x="0" y="110" font-size="13" fill="#94a3b8">TPS Wins</text>
+        <text x="300" y="110" font-size="16" font-weight="bold" fill="#f97316">7 / 8 ✓</text>
+
+        <text x="0" y="140" font-size="13" fill="#94a3b8">Best In</text>
+        <text x="300" y="140" font-size="13" fill="#fbbf24">long_context (-52% TTFT)</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Divider -->
+  <line x1="80" y1="1900" x2="1120" y2="1900" stroke="#334155" stroke-width="2"/>
+
+  <!-- ============================================ -->
+  <!-- SECTION 4: Detailed Table                    -->
+  <!-- ============================================ -->
+  <g transform="translate(0,1940)">
+    <text x="600" y="0" text-anchor="middle" font-size="20" font-weight="bold" fill="#f1f5f9">Detailed Results Table</text>
+
+    <!-- Table Header -->
+    <g transform="translate(80,30)">
+      <rect x="0" y="0" width="1040" height="30" fill="#334155" rx="4"/>
+      <text x="10" y="20" font-size="12" font-weight="bold" fill="#e2e8f0">Test</text>
+      <text x="180" y="20" font-size="12" font-weight="bold" fill="#76b900">NVIDIA TTFT</text>
+      <text x="310" y="20" font-size="12" font-weight="bold" fill="#76b900">NVIDIA TPS</text>
+      <text x="440" y="20" font-size="12" font-weight="bold" fill="#f97316">Unsloth TTFT</text>
+      <text x="570" y="20" font-size="12" font-weight="bold" fill="#f97316">Unsloth TPS</text>
+      <text x="700" y="20" font-size="12" font-weight="bold" fill="#e2e8f0">TTFT Δ</text>
+      <text x="830" y="20" font-size="12" font-weight="bold" fill="#e2e8f0">TPS Δ</text>
+    </g>
+
+    <!-- Row 1: simple_chat -->
+    <g transform="translate(80,75)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">simple_chat</text>
+      <text x="180" y="15" font-size="11" fill="#e2e8f0">149 ms</text>
+      <text x="310" y="15" font-size="11" fill="#e2e8f0">80.1</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">116 ms</text>
+      <text x="570" y="15" font-size="11" fill="#f97316">85.0</text>
+      <text x="700" y="15" font-size="11" fill="#22c55e">-22%</text>
+      <text x="830" y="15" font-size="11" fill="#22c55e">+6.1%</text>
+    </g>
+
+    <!-- Row 2: long_context -->
+    <g transform="translate(80,110)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">long_context</text>
+      <text x="180" y="15" font-size="11" fill="#e2e8f0">834 ms</text>
+      <text x="310" y="15" font-size="11" fill="#e2e8f0">57.6</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">403 ms</text>
+      <text x="570" y="15" font-size="11" fill="#f97316">75.1</text>
+      <text x="700" y="15" font-size="11" fill="#22c55e">-52%</text>
+      <text x="830" y="15" font-size="11" fill="#22c55e">+30.4%</text>
+    </g>
+
+    <!-- Row 3: code_generation -->
+    <g transform="translate(80,145)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">code_generation</text>
+      <text x="180" y="15" font-size="11" fill="#e2e8f0">134 ms</text>
+      <text x="310" y="15" font-size="11" fill="#e2e8f0">93.9</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">111 ms</text>
+      <text x="570" y="15" font-size="11" fill="#f97316">98.8</text>
+      <text x="700" y="15" font-size="11" fill="#22c55e">-17%</text>
+      <text x="830" y="15" font-size="11" fill="#22c55e">+5.2%</text>
+    </g>
+
+    <!-- Row 4: reasoning -->
+    <g transform="translate(80,180)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">reasoning</text>
+      <text x="180" y="15" font-size="11" fill="#e2e8f0">163 ms</text>
+      <text x="310" y="15" font-size="11" fill="#e2e8f0">104.3</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">108 ms</text>
+      <text x="570" y="15" font-size="11" fill="#f97316">111.2</text>
+      <text x="700" y="15" font-size="11" fill="#22c55e">-34%</text>
+      <text x="830" y="15" font-size="11" fill="#22c55e">+6.6%</text>
+    </g>
+
+    <!-- Row 5: tool_calling -->
+    <g transform="translate(80,215)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">tool_calling</text>
+      <text x="180" y="15" font-size="11" fill="#76b900">158 ms</text>
+      <text x="310" y="15" font-size="11" fill="#76b900">99.3</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">115 ms</text>
+      <text x="570" y="15" font-size="11" fill="#e2e8f0">90.6</text>
+      <text x="700" y="15" font-size="11" fill="#ef4444">+27%</text>
+      <text x="830" y="15" font-size="11" fill="#ef4444">-8.8%</text>
+    </g>
+
+    <!-- Row 6: long_output -->
+    <g transform="translate(80,250)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">long_output</text>
+      <text x="180" y="15" font-size="11" fill="#e2e8f0">164 ms</text>
+      <text x="310" y="15" font-size="11" fill="#e2e8f0">87.9</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">113 ms</text>
+      <text x="570" y="15" font-size="11" fill="#f97316">92.0</text>
+      <text x="700" y="15" font-size="11" fill="#22c55e">-31%</text>
+      <text x="830" y="15" font-size="11" fill="#22c55e">+4.7%</text>
+    </g>
+
+    <!-- Row 7: multi_turn -->
+    <g transform="translate(80,285)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">multi_turn (avg)</text>
+      <text x="180" y="15" font-size="11" fill="#e2e8f0">162 ms</text>
+      <text x="310" y="15" font-size="11" fill="#e2e8f0">86.9</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">114 ms</text>
+      <text x="570" y="15" font-size="11" fill="#f97316">89.8</text>
+      <text x="700" y="15" font-size="11" fill="#22c55e">-30%</text>
+      <text x="830" y="15" font-size="11" fill="#22c55e">+3.3%</text>
+    </g>
+
+    <!-- Row 8: mixed_workload -->
+    <g transform="translate(80,320)">
+      <text x="10" y="15" font-size="11" fill="#94a3b8">mixed_workload (avg)</text>
+      <text x="180" y="15" font-size="11" fill="#e2e8f0">167 ms</text>
+      <text x="310" y="15" font-size="11" fill="#e2e8f0">87.4</text>
+      <text x="440" y="15" font-size="11" fill="#f97316">109 ms</text>
+      <text x="570" y="15" font-size="11" fill="#f97316">99.9</text>
+      <text x="700" y="15" font-size="11" fill="#22c55e">-35%</text>
+      <text x="830" y="15" font-size="11" fill="#22c55e">+14.3%</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <g transform="translate(0,2290)">
+    <line x1="80" y1="0" x2="1120" y2="0" stroke="#334155" stroke-width="1"/>
+    <text x="600" y="20" text-anchor="middle" font-size="11" fill="#64748b">
+      Generated 2026-08-13 · Source: benchmark/results/ · Green = NVIDIA ModelOpt · Orange = Unsloth Compressed-Tensors
+    </text>
+    <text x="600" y="40" text-anchor="middle" font-size="10" fill="#475569">
+      ✓ = Winner in category · Δ = Percentage improvement (negative = faster for TTFT, positive = higher for TPS)
+    </text>
+  </g>
+</svg>
