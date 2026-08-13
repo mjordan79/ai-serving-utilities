@@ -8,10 +8,10 @@ by Renato Perini (mjordan79)
 
 ## Models
 
-| Model | Producer | Publisher | Directory | Description |
-|-------|----------|-----------|-----------|-------------|
-| Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM (ModelOpt) |
-| Qwen 3.6 — 27B NVFP4 | Alibaba | Unsloth | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | `unsloth/Qwen3.6-27B-NVFP4` on vLLM (Compressed-Tensors) |
+| Model | Producer | Publisher | Directory | HF Page | Description |
+|-------|----------|-----------|-----------|---------|-------------|
+| Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | [nvidia/Qwen3.6-27B-NVFP4](https://huggingface.co/nvidia/Qwen3.6-27B-NVFP4) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM (ModelOpt) |
+| Qwen 3.6 — 27B NVFP4 | Alibaba | Unsloth | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | [unsloth/Qwen3.6-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.6-27B-NVFP4) | `unsloth/Qwen3.6-27B-NVFP4` on vLLM (Compressed-Tensors) |
 
 ## Directory Convention
 
