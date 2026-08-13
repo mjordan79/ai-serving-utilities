@@ -10,7 +10,8 @@ by Renato Perini (mjordan79)
 
 | Model | Producer | Publisher | Directory | Description |
 |-------|----------|-----------|-----------|-------------|
-| Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM |
+| Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM (ModelOpt) |
+| Qwen 3.6 — 27B NVFP4 | Alibaba | Unsloth | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | `unsloth/Qwen3.6-27B-NVFP4` on vLLM (Compressed-Tensors) |
 
 ## Directory Convention
 
