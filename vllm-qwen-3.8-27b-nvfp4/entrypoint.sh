@@ -33,7 +33,7 @@ fi
 # Every flag has a default here; override in docker-compose.yml to change.
 
 # Model
-MODEL_NAME="${MODEL_NAME:-nvidia/Qwen3.6-27B-NVFP4}"
+MODEL_NAME="${MODEL_NAME:-unsloth/Qwen3.8-27B-NVFP4}"
 DTYPE="${DTYPE:-auto}"
 TP_SIZE="${TP_SIZE:-1}"
 

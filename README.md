@@ -10,15 +10,17 @@ by Renato Perini (mjordan79)
 
 | Model | Producer | Publisher | Directory | HF Page | Description |
 |-------|----------|-----------|-----------|---------|-------------|
-| Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | [nvidia/Qwen3.6-27B-NVFP4](https://huggingface.co/nvidia/Qwen3.6-27B-NVFP4) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM (ModelOpt) |
-| Qwen 3.6 — 27B NVFP4 | Alibaba | Unsloth | [`vllm-nvidia-qwen-3.6-27b-nvfp4/`](vllm-nvidia-qwen-3.6-27b-nvfp4/) | [unsloth/Qwen3.6-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.6-27B-NVFP4) | `unsloth/Qwen3.6-27B-NVFP4` on vLLM (Compressed-Tensors) |
+| Qwen 3.8 — 27B NVFP4 | Alibaba | Unsloth | [`vllm-qwen-3.8-27b-nvfp4/`](vllm-qwen-3.8-27b-nvfp4/) | [unsloth/Qwen3.8-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) | `unsloth/Qwen3.8-27B-NVFP4` on vLLM (Compressed-Tensors) |
+| Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-qwen-3.8-27b-nvfp4/`](vllm-qwen-3.8-27b-nvfp4/) | [nvidia/Qwen3.6-27B-NVFP4](https://huggingface.co/nvidia/Qwen3.6-27B-NVFP4) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM (ModelOpt) |
+
+Both variants are served by the **same deployment** — the active checkpoint is selected in `.env` (`MODEL_NAME`, `QUANTIZATION`), not in the directory name.
 
 ## Directory Convention
 
 Every model deployment follows the same structure:
 
 ```
-<runtime>-<provider>-<model-name>/
+<runtime>-<model-name>/
 ├── docker-compose.yml    # Service definition
 ├── Dockerfile            # Custom image
 ├── entrypoint.sh         # Startup script (HF token, API key, model download)
@@ -27,8 +29,9 @@ Every model deployment follows the same structure:
 ```
 
 **Runtime** — the serving framework (e.g., `vllm`, `tgi`, `llama-cpp`, `ollama`).  
-**Provider** — the model publisher (e.g., `nvidia`, `meta`, `mistral`, `google`).  
-**Model name** — lowercase, hyphenated, includes size/precision (e.g., `qwen-3.6-27b-nvfp4`).
+**Model name** — lowercase, hyphenated, includes size/precision (e.g., `qwen-3.8-27b-nvfp4`).
+
+One directory per model deployment. Where the same deployment can serve multiple HuggingFace checkpoints (different publisher/quantization), the variant is selected in `.env` (`MODEL_NAME`, `QUANTIZATION`) rather than in the directory name.
 
 ## Quick Start
 
