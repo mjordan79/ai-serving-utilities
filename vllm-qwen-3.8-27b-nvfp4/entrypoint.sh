@@ -50,7 +50,7 @@ DTYPE="${DTYPE:-auto}"
 TP_SIZE="${TP_SIZE:-1}"
 
 # Memory & Context
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.92}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.94}"
 # Default 116K — conservative to avoid OOM. Increase to 131072 if VRAM allows.
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-116800}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
@@ -76,6 +76,10 @@ ENABLE_PROMPT_TOKENS_DETAILS="${ENABLE_PROMPT_TOKENS_DETAILS:-true}"
 REASONING_PARSER="${REASONING_PARSER:-qwen3}"
 TOOL_CALL_PARSER="${TOOL_CALL_PARSER:-qwen3_coder}"
 DEFAULT_ENABLE_THINKING="${DEFAULT_ENABLE_THINKING:-true}"
+# Keep historical assistant thinking in multi-turn context. Model default is true (preserve);
+# false strips it to save context. Inert unless the client echoes reasoning back.
+# Per-request chat_template_kwargs can still override.
+DEFAULT_PRESERVE_THINKING="${DEFAULT_PRESERVE_THINKING:-true}"
 
 # Loading
 SAFETENSORS_LOAD_STRATEGY="${SAFETENSORS_LOAD_STRATEGY:-prefetch}"
@@ -143,7 +147,7 @@ if [ "${LANGUAGE_MODEL_ONLY-}" != "false" ]; then
   LANG_MODEL_ARGS=(--language-model-only)
 fi
 
-THINKING_KWARGS='{"enable_thinking": '"$DEFAULT_ENABLE_THINKING"'}'
+CHAT_TEMPLATE_KWARGS='{"enable_thinking": '"$DEFAULT_ENABLE_THINKING"', "preserve_thinking": '"$DEFAULT_PRESERVE_THINKING"'}'
 
 exec vllm serve "$MODEL_NAME" \
   "${API_KEY_ARGS[@]}" \
@@ -163,7 +167,7 @@ exec vllm serve "$MODEL_NAME" \
   "${PREFIX_CACHING_ARGS[@]}" \
   "${HYBRID_KV_ARGS[@]}" \
   --reasoning-parser "$REASONING_PARSER" \
-  --default-chat-template-kwargs "$THINKING_KWARGS" \
+  --default-chat-template-kwargs "$CHAT_TEMPLATE_KWARGS" \
   "${AUTO_TOOL_CHOICE_ARGS[@]}" \
   --tool-call-parser "$TOOL_CALL_PARSER" \
   --quantization "$QUANTIZATION" \
