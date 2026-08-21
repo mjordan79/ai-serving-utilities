@@ -50,7 +50,7 @@ DTYPE="${DTYPE:-auto}"
 TP_SIZE="${TP_SIZE:-1}"
 
 # Memory & Context
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.94}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.92}"
 # Default 116K — conservative to avoid OOM. Increase to 131072 if VRAM allows.
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-116800}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
@@ -83,7 +83,6 @@ SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-true}"
 # Default = Unsloth variant (compressed-tensors). NVIDIA variant: QUANTIZATION=modelopt in .env.
 QUANTIZATION="${QUANTIZATION:-compressed-tensors}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
-LANGUAGE_MODEL_ONLY="${LANGUAGE_MODEL_ONLY:-false}"
 
 # API
 PORT="${PORT:-8000}"
@@ -140,7 +139,7 @@ if [ "$TRUST_REMOTE_CODE" = "true" ]; then
 fi
 
 LANG_MODEL_ARGS=()
-if [ "$LANGUAGE_MODEL_ONLY" = "true" ]; then
+if [ "${LANGUAGE_MODEL_ONLY-}" != "false" ]; then
   LANG_MODEL_ARGS=(--language-model-only)
 fi
 
