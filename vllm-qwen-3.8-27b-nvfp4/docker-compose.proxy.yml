@@ -8,7 +8,9 @@ services:
 
     # Pass Let's Encrypt vars to vllm (read by acme-companion via Docker socket)
     environment:
-      - LETSENCRYPT_HOST
+      - VIRTUAL_HOST=${LETSENCRYPT_DOMAIN}
+      - VIRTUAL_PORT=8000
+      - LETSENCRYPT_HOST=${LETSENCRYPT_DOMAIN}
       - LETSENCRYPT_EMAIL
 
   docker-gen:
@@ -68,6 +70,20 @@ services:
             -out /etc/nginx/certs/cert.pem \
             -subj "/CN=localhost"
           echo "[nginx] Placeholder certificate generated. Acme-companion will replace it."
+        fi
+        if [ -n "$LETSENCRYPT_DOMAIN" ]; then
+          (
+            while :; do
+              if [ -f "/etc/nginx/certs/$LETSENCRYPT_DOMAIN.crt" ] && [ ! -L /etc/nginx/certs/cert.pem ]; then
+                echo "[nginx] ACME certificate found; switching from placeholder..."
+                ln -sf "/etc/nginx/certs/$LETSENCRYPT_DOMAIN.crt" /etc/nginx/certs/cert.pem
+                ln -sf "/etc/nginx/certs/$LETSENCRYPT_DOMAIN.key" /etc/nginx/certs/key.pem
+                nginx -s reload 2>/dev/null || true
+                break
+              fi
+              sleep 5
+            done
+          ) &
         fi
         exec /docker-entrypoint.sh nginx -g "daemon off;"
       '
