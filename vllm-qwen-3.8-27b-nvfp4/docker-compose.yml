@@ -36,6 +36,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MODEL_NAME=${MODEL_NAME:-unsloth/Qwen3.8-27B-NVFP4}
+      # Pass-through: if set in .env the entrypoint uses this key; if empty the
+      # entrypoint generates and persists sk-<uuid> in the vllm-keys volume.
+      - VLLM_API_KEY=${VLLM_API_KEY:-}
       - ENABLE_API_KEY=true
       - DTYPE=auto
       - SAFETENSORS_LOAD_STRATEGY=prefetch
@@ -56,7 +59,9 @@ services:
       - DEFAULT_ENABLE_THINKING=true
       - ENABLE_AUTO_TOOL_CHOICE=true
       - TOOL_CALL_PARSER=qwen3_coder
-      - QUANTIZATION=${QUANTIZATION:-modelopt}
+      # Default fallback = Unsloth variant (matches MODEL_NAME default and docs).
+      # NVIDIA variant: set QUANTIZATION=modelopt + HF_CACHE_VOLUME=hf-cache-nvidia in .env.
+      - QUANTIZATION=${QUANTIZATION:-compressed-tensors}
       - ENABLE_MTP=true
       - MTP_NUM_SPECULATIVE_TOKENS=2
       - TRUST_REMOTE_CODE=true
@@ -67,7 +72,8 @@ services:
       - HF_TOKEN=${HF_TOKEN}
 
     volumes:
-      - ${HF_CACHE_VOLUME:-hf-cache-nvidia}:/root/.cache/huggingface
+      # Default fallback = Unsloth cache (matches documented default variant).
+      - ${HF_CACHE_VOLUME:-hf-cache-unsloth}:/root/.cache/huggingface
       - vllm-keys:/root/.vllm-key
 
     ports:

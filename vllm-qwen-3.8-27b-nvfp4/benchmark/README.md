@@ -4,10 +4,6 @@ by Renato Perini (mjordan79)
 
 Curl-based benchmark suite for vLLM deployments. No Python, no external dependencies beyond `bash`, `curl`, `gawk`, `date`.
 
-## Visual Comparison Report
-
-![Benchmark Comparison: NVIDIA ModelOpt vs. Unsloth Compressed-Tensors](results/benchmark_comparison.svg)
-
 ## Structure
 
 ```
@@ -25,10 +21,12 @@ benchmark/
 │   ├── 06_long_output.sh        # Long output (up to 4096 tokens)
 │   ├── 07_multi_turn.sh         # Multi-turn conversation (3 turns)
 │   └── 08_mixed_workload.sh     # Mixed task types (Q&A, code, reasoning, translation)
-└── results/
-    └── <model_label>/
-        ├── results_YYYYMMDD_HHMMSS.tsv   # Raw TSV data
-        └── report_YYYYMMDD_HHMMSS.md     # Markdown report
+└── results/                # gitignored — raw data and generated reports
+    ├── <model_label>/
+    │   ├── results_YYYYMMDD_HHMMSS.tsv   # Raw TSV data
+    │   └── report_YYYYMMDD_HHMMSS.md     # Markdown report
+    └── comparison/
+        └── comparison_YYYYMMDD_HHMMSS.md # Side-by-side report (compare.sh)
 ```
 
 ## Configuration
@@ -37,8 +35,8 @@ All configuration is auto-detected from the project's `.env` file (`../.env`):
 
 | .env Variable | Auto-Derived | Used For |
 |---------------|--------------|----------|
-| `LETSENCRYPT_DOMAIN` | → `BASE_URL` | `https://<domain>` if set, else `http://localhost:1235` |
-| `VLLM_API_KEY` | → `API_KEY` | Recovered via `docker compose exec` from container |
+| `LETSENCRYPT_DOMAIN` | → `BASE_URL` | `https://<domain>` if the domain resolves, else `http://localhost:1235` |
+| *(not from .env)* | → `API_KEY` | Recovered live from the running container via `docker compose exec` (falls back to `docker exec`, then an interactive prompt). The `.env` `VLLM_API_KEY` is **never read** by the scripts |
 | `MODEL_NAME` | → `MODEL_LABEL` | Result directory naming |
 | `QUANTIZATION` | → `MODEL_LABEL` | Appended to model label (e.g., `nvidia/Qwen3.6-27B-NVFP4 (modelopt)`) |
 
@@ -48,18 +46,20 @@ No manual config files needed. The scripts read the project state directly.
 
 - `bash` (5.0+)
 - `curl` (with `-k` support for SSL)
-- `gawk` (for `asorti` in compare.sh)
+- `gawk` (uses the gawk-only `asorti` in `run.sh` and `compare.sh`; plain `mawk`/`awk` will not work)
 - `date` with `%N` support (nanoseconds)
 
 No `jq` required — all JSON parsing is handled via `gawk`/`sed`.
 
 ## Usage
 
+> Scripts are committed without the executable bit (Windows convention) — invoke with `bash`.
+
 ### 1. Warmup (required before benchmarking)
 
 ```bash
 cd benchmark
-./warmup.sh
+bash warmup.sh
 ```
 
 Auto-detects the project `.env`, recovers the API key via Docker, and sends diverse prompts to pre-compile Triton kernels. **Skip this and your first iteration will be artificially slow.**
@@ -68,17 +68,19 @@ Auto-detects the project `.env`, recovers the API key via Docker, and sends dive
 
 ```bash
 # All tests
-./run.sh
+bash run.sh
 
 # Single test
-./run.sh 01_simple_chat
+bash run.sh 01_simple_chat
 ```
 
 ### 3. Compare results
 
 ```bash
-./compare.sh results/nvidia-Qwen3.6-27B-NVFP4-modelopt results/unsloth-Qwen3.6-27B-NVFP4-compressed-tensors
+bash compare.sh 'results/unsloth_Qwen3-8-27B-NVFP4-(compressed-tensors)' 'results/nvidia_Qwen3-6-27B-NVFP4-(modelopt)'
 ```
+
+Directory names are produced by `run.sh` from `MODEL_NAME + " (${QUANTIZATION})"` sanitized via `tr` (`/` → `_`, `.` → `-`, space → `-`). The markdown report is written to `results/comparison/`.
 
 ## Metrics
 

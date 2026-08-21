@@ -86,7 +86,7 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme-co
 
 Once the certificate is ready, access the API at `https://<your-domain.duckdns.org>`.
 
-> **Without the proxy overlay**, the API is exposed directly on `localhost:1235` (HTTP, local only).
+> **Without the proxy overlay**, the API is exposed directly on port `1235` (HTTP). Compose binds this port on `0.0.0.0` by default, so it is reachable from the LAN, not only localhost. It is Bearer-authenticated, but use the TLS proxy for anything non-local.
 
 ### 3. Get your API key
 
@@ -151,35 +151,85 @@ curl -k https://<your-domain>/v1/chat/completions \
 
 ## Configurable Parameters
 
-All parameters are in `docker-compose.yml` under `environment`:
+All parameters are in `docker-compose.yml` under `environment` (values marked *from `.env`* are interpolated from your `.env` file):
+
+### Model & quantization
 
 | Variable | Default | Description |
 |---|---|---|
 | `MODEL_NAME` | `unsloth/Qwen3.8-27B-NVFP4` | HuggingFace model name — set per variant in `.env` |
 | `QUANTIZATION` | `compressed-tensors` | Quantization backend — `modelopt` for the NVIDIA variant |
 | `HF_CACHE_VOLUME` | `hf-cache-unsloth` | Named volume for the HF cache — one per variant |
-| `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
 | `MAX_MODEL_LEN` | `116800` | Maximum context length — set per variant in `.env` (NVIDIA: `131072`, Unsloth: `116800`) |
+| `DTYPE` | `auto` | Data type for model weights |
+| `TRUST_REMOTE_CODE` | `true` | Pass `--trust-remote-code` (required by some HF repos) |
+| `SKIP_MM_PROFILING` | `true` | Skip multimodal profiling at startup |
+| `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
+
+### Performance
+
+| Variable | Default | Description |
+|---|---|---|
+| `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
+| `GPU_MEMORY_UTILIZATION` | `0.92` | Fraction of usable VRAM (0.0–1.0) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
-| `GPU_MEMORY_UTILIZATION` | `0.92` | Fraction of usable VRAM (0.0–1.0) |
-| `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding, 2 tokens) |
+| `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
+| `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
+| `PERFORMANCE_MODE` | `interactivity` | vLLM performance mode |
+| `ENABLE_CHUNKED_PREFILL` | `true` | Split long prefills into chunks |
+| `ENABLE_PREFIX_CACHING` | `true` | Cache shared prompt prefixes |
+| `ENABLE_HYBRID_KV_CACHE_MANAGER` | `true` | Hybrid (CPU+GPU) KV cache manager |
+| `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding) |
+| `MTP_NUM_SPECULATIVE_TOKENS` | `2` | Speculative tokens per step |
+
+### Behavior & features
+
+| Variable | Default | Description |
+|---|---|---|
+| `LANGUAGE_MODEL_ONLY` | `false` | Deliberate override of the entrypoint default (`true`). When `true`, vLLM starts with `--language-model-only` (skips the multimodal stack). Compose sets `false` to keep the full server path; set `true` in `.env` if you want the lighter LLM-only startup |
+| `REASONING_PARSER` | `qwen3` | Parser that splits reasoning content from the response |
+| `DEFAULT_ENABLE_THINKING` | `true` | Server-side default for `enable_thinking` (per-request `chat_template_kwargs` overrides it) |
+| `TOOL_CALL_PARSER` | `qwen3_coder` | Tool-call response parser |
+| `ENABLE_AUTO_TOOL_CHOICE` | `true` | Allow `tool_choice: "auto"` |
+
+### API & server
+
+| Variable | Default | Description |
+|---|---|---|
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
+| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set in `.env` to use a fixed key; if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
-| `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
+| `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Detailed prompt-token breakdown in usage |
+| `PORT` | `8000` | In-container port (host mapping `1235:8000`) |
+
+### Runtime & low-level
+
+| Variable | Default | Description |
+|---|---|---|
+| `SAFETENSORS_LOAD_STRATEGY` | `prefetch` | Weight loading strategy |
+| `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `0` | Disable CUDA-graph memory profiling |
+| `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/tmp/flashinfer_autotune_cache` | FlashInfer autotune cache location |
+| `NVIDIA_VISIBLE_DEVICES` | `all` | GPU passthrough |
+| `NVIDIA_DRIVER_CAPABILITIES` | `compute,utility` | GPU driver capabilities |
+
+### Proxy overlay (Let's Encrypt)
+
+| Variable | Default | Description |
+|---|---|---|
 | `LETSENCRYPT_DOMAIN` | *(none)* | Domain for Let's Encrypt certificate (e.g., `my-domain.duckdns.org`) |
 | `LETSENCRYPT_EMAIL` | *(none)* | Email for Let's Encrypt certificate notifications |
 
 ## Notes
 
 - **Variants:** `unsloth/Qwen3.8-27B-NVFP4` (Compressed-Tensors, default) and `nvidia/Qwen3.6-27B-NVFP4` (ModelOpt). To switch, edit the `MODEL_NAME` / `QUANTIZATION` / `HF_CACHE_VOLUME` / `MAX_MODEL_LEN` block in `.env` and run `docker compose up -d`. Each variant has its own HF cache volume, so the first run after a switch downloads that variant's weights.
-- **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to `/root/.vllm-key/.api_key` (bind-mounted to the host). Retrieve it with `docker exec vllm-server cat /root/.vllm-key/.api_key`. To override, set `VLLM_API_KEY` in your environment. To disable, set `ENABLE_API_KEY=false`.
+- **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (compose passes it through; the entrypoint uses it instead of generating one). To disable, set `ENABLE_API_KEY=false`.
 - **MTP (Multi-Token Prediction):** the NVFP4 checkpoints include up to 3 MTP layers. Default is 2 speculative tokens for better compute/accuracy balance (per-position acceptance rate ~60-70% at position 1-2 vs ~30-50% at position 3). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.92` on 32 GB, consumption is ~29.4 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
-- **Port:** the API is exposed on `localhost:1235` (mapped from internal port 8000).
+- **Port:** the API is exposed on host port `1235` (mapped from internal port 8000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
 - **Reverse Proxy:** two modes via overlay:
-  - **Direct** (default): `docker compose up -d` → API on `localhost:1235` (HTTP, local only)
+  - **Direct** (default): `docker compose up -d` → API on port `1235` (HTTP, LAN-reachable, Bearer-authenticated)
   - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
   - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
   - When proxy mode is active, ports 80/443 are exposed and port 1235 is automatically disabled — all traffic routes through nginx.

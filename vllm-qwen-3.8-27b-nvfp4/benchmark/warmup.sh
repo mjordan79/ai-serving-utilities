@@ -13,55 +13,38 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="${SCRIPT_DIR}/.."
 
-# ── Auto-detect configuration from project .env ──────────────────────────────
+source "${SCRIPT_DIR}/lib.sh"
+
+# ── Auto-detect configuration from project .env (shared with run.sh — lib.sh) ─
 
 ENV_FILE="${PROJECT_DIR}/.env"
-
-if [[ ! -f "$ENV_FILE" ]]; then
-    echo "ERROR: Project .env not found at ${ENV_FILE}"
-    exit 1
-fi
-
-while IFS='=' read -r key value; do
-    [[ "$key" =~ ^[[:space:]]*# ]] && continue
-    [[ -z "$key" ]] && continue
-    key=$(echo "$key" | xargs)
-    value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
-    [[ -z "$key" ]] && continue
-    export "$key=$value"
-done < "$ENV_FILE"
-
-if [[ -n "${LETSENCRYPT_DOMAIN:-}" ]]; then
-    if curl -sS -k --max-time 5 --output /dev/null "https://${LETSENCRYPT_DOMAIN}/health" 2>/dev/null; then
-        BASE_URL="https://${LETSENCRYPT_DOMAIN}"
-    else
-        echo "INFO: ${LETSENCRYPT_DOMAIN} not reachable, falling back to https://localhost"
-        BASE_URL="https://localhost"
-    fi
-else
-    BASE_URL="http://localhost:1235"
-fi
-
-API_KEY=""
-if command -v docker &>/dev/null; then
-    API_KEY=$(docker compose -f "${PROJECT_DIR}/docker-compose.yml" \
-        exec --no-deps vllm-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
-fi
-if [[ -z "$API_KEY" ]] && command -v docker &>/dev/null; then
-    API_KEY=$(docker exec vllm-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
-fi
-if [[ -z "$API_KEY" ]]; then
-    echo -n "Enter VLLM_API_KEY: " >&2
-    read -r API_KEY >&2
-fi
-export API_KEY
-
-source "${SCRIPT_DIR}/lib.sh"
+parse_project_env "$ENV_FILE"
+resolve_base_url
+recover_api_key
 
 WARMUP_LOG="${SCRIPT_DIR}/results/warmup_$(date +%Y%m%d_%H%M%S).log"
 mkdir -p "${SCRIPT_DIR}/results"
 
-log() { echo "[$(date '+%H:%M:%S')] $*"; }
+log() {
+    local msg="[$(date '+%H:%M:%S')] $*"
+    echo "$msg"
+    echo "$msg" >> "$WARMUP_LOG"
+}
+
+# Send a warmup request. Phases are best-effort (no abort on failure), but HTTP
+# errors are logged — curl -f makes 4xx/5xx fail so payload bugs are not silent.
+post() {
+    local payload="$1" max_time="$2" label="$3"
+    if curl -fsS -k --max-time "$max_time" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1; then
+        log "  ✓ ${label}"
+    else
+        log "  ⚠ ${label} FAILED (HTTP error or timeout)"
+        # Not fatal: remaining phases may still compile useful kernels.
+    fi
+}
 
 log "═══════════════════════════════════════════════════════════"
 log "  WARMUP — Triton kernel pre-compilation"
@@ -93,22 +76,14 @@ fi
 log "Phase 2: Short prefill + short decode (kernel warmup)..."
 for i in 1 2 3; do
     payload=$(printf '{"model":"%s","stream":false,"temperature":0.7,"max_tokens":64,"messages":[{"role":"user","content":"Warmup prompt #%d. What is 2+2?"}]}' "${MODEL_NAME:-auto}" "$i")
-    curl -sS -k --max-time 60 \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${API_KEY}" \
-        -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1
-    log "  ✓ Short request ${i}/3"
+    post "$payload" 60 "Short request ${i}/3"
 done
 
 # ── Phase 3: Medium prefill, medium decode ─────────────────────────────────
 log "Phase 3: Medium prefill + medium decode..."
 for i in 1 2; do
     payload=$(printf '{"model":"%s","stream":false,"temperature":0.5,"max_tokens":512,"messages":[{"role":"user","content":"Write a Python function that implements a binary search tree with insert, delete, and search operations. Include type hints and docstrings. The tree should handle duplicate values by storing a count. Provide the complete class implementation with proper error handling."}]}' "${MODEL_NAME:-auto}")
-    curl -sS -k --max-time 120 \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${API_KEY}" \
-        -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1
-    log "  ✓ Medium request ${i}/2"
+    post "$payload" 120 "Medium request ${i}/2"
 done
 
 # ── Phase 4: Long prefill (context window warmup) ───────────────────────────
@@ -120,57 +95,37 @@ for i in $(seq 1 20); do
 done
 
 escaped_ctx=$(json_escape "$long_text")
-    payload=$(printf '{"model":"%s","stream":false,"temperature":0.3,"max_tokens":128,"messages":[{"role":"user","content":"Summarize this technical document in 3 sentences:\n\n%s"}]}' "${MODEL_NAME:-auto}" "$escaped_ctx")
-curl -sS -k --max-time 180 \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${API_KEY}" \
-    -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1
-log "  ✓ Long prefill done"
+    # NOTE: \\n in the printf format → literal backslash-n in the JSON payload
+    # (escaped newline). A real newline would break the JSON string → HTTP 400.
+    payload=$(printf '{"model":"%s","stream":false,"temperature":0.3,"max_tokens":128,"messages":[{"role":"user","content":"Summarize this technical document in 3 sentences:\\n\\n%s"}]}' "${MODEL_NAME:-auto}" "$escaped_ctx")
+    post "$payload" 180 "Long prefill"
 
 # ── Phase 5: Long decode (sustained generation) ─────────────────────────────
 log "Phase 5: Long decode (2048 token output)..."
 payload=$(printf '{"model":"%s","stream":false,"temperature":0.7,"max_tokens":2048,"messages":[{"role":"user","content":"Write a detailed technical tutorial on building a REST API with FastAPI in Python. Cover dependency injection, middleware, background tasks, and database integration with SQLAlchemy. Include code examples for each section."}]}' "${MODEL_NAME:-auto}")
-curl -sS -k --max-time 300 \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${API_KEY}" \
-    -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1
-log "  ✓ Long decode done"
+post "$payload" 300 "Long decode"
 
 # ── Phase 6: Reasoning path warmup ──────────────────────────────────────────
 log "Phase 6: Reasoning/thinking path warmup..."
-if [[ "${ENABLE_THINKING:-true}" == "true" ]]; then
-    payload=$(printf '{"model":"%s","stream":false,"temperature":0.3,"max_tokens":1024,"messages":[{"role":"user","content":"Solve: A water tank has two inlet pipes and one outlet pipe. Pipe A fills the tank in 3 hours, Pipe B in 5 hours, and the outlet empties it in 8 hours. If all three are open simultaneously, how long to fill an empty tank? Show step by step."}],"extra_body":{"thinking":{"type":"enabled"}}}' "${MODEL_NAME:-auto}")
-    curl -sS -k --max-time 180 \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${API_KEY}" \
-        -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1
-    log "  ✓ Reasoning path done"
-fi
+# chat_template_kwargs is the real JSON body field (extra_body is a no-op in raw
+# JSON — it is a Python-SDK concept). Overrides the server-side default.
+think_flag="true"
+[[ "${ENABLE_THINKING:-true}" == "true" ]] || think_flag="false"
+payload=$(printf '{"model":"%s","stream":false,"temperature":0.3,"max_tokens":1024,"messages":[{"role":"user","content":"Solve: A water tank has two inlet pipes and one outlet pipe. Pipe A fills the tank in 3 hours, Pipe B in 5 hours, and the outlet empties it in 8 hours. If all three are open simultaneously, how long to fill an empty tank? Show step by step."}],"chat_template_kwargs":{"enable_thinking":%s}}' "${MODEL_NAME:-auto}" "$think_flag")
+post "$payload" 180 "Reasoning path (thinking=${think_flag})"
 
 # ── Phase 7: Tool calling path warmup ───────────────────────────────────────
 log "Phase 7: Tool calling path warmup..."
 payload=$(printf '{"model":"%s","stream":false,"temperature":0.3,"max_tokens":256,"messages":[{"role":"user","content":"What is the weather in London?"}],"tools":[{"type":"function","function":{"name":"get_weather","description":"Get weather for a city","parameters":{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}}}]}' "${MODEL_NAME:-auto}")
-curl -sS -k --max-time 60 \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${API_KEY}" \
-    -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1
-log "  ✓ Tool calling path done"
+post "$payload" 60 "Tool calling path"
 
 # ── Phase 8: Streaming path warmup ──────────────────────────────────────────
 log "Phase 8: Streaming path warmup..."
 payload=$(printf '{"model":"%s","stream":true,"temperature":0.7,"max_tokens":256,"messages":[{"role":"user","content":"Write a haiku about artificial intelligence."}]}' "${MODEL_NAME:-auto}")
-# Consume the stream fully
-curl -sS -k --max-time 60 \
-    -H "Content-Type: application/json" \
-    -H "Authorization: Bearer ${API_KEY}" \
-    -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1
-log "  ✓ Streaming path done"
+post "$payload" 60 "Streaming path"
 
 # ── Done ────────────────────────────────────────────────────────────────────
 log "═══════════════════════════════════════════════════════════"
 log "  WARMUP COMPLETE — Model is ready for benchmarking"
 log "═══════════════════════════════════════════════════════════"
 log "Log: ${WARMUP_LOG}"
-
-# Save a copy of this output
-echo "$(date): Warmup completed successfully" >> "$WARMUP_LOG"

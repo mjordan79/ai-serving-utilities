@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # run.sh — Master benchmark runner.
 #
-# Usage:
-#   ./run.sh                     Run all benchmarks
-#   ./run.sh <test>              Run a single test (e.g., 01_simple_chat)
+# Usage (invoke via bash — the scripts are stored in git without the exec bit):
+#   bash run.sh                  Run all benchmarks
+#   bash run.sh <test>           Run a single test (e.g., 01_simple_chat)
 #
 # Reads configuration from the project's .env file (parent directory).
 # Recovers API_KEY automatically via docker compose.
@@ -23,66 +23,10 @@ source "${SCRIPT_DIR}/lib.sh"
 
 ENV_FILE="${PROJECT_DIR}/.env"
 
-if [[ ! -f "$ENV_FILE" ]]; then
-    echo "ERROR: Project .env not found at ${ENV_FILE}"
-    echo "       Make sure you're running this from the benchmark/ directory."
-    exit 1
-fi
-
-# Parse .env (skip comments and empty lines, handle quoted values)
-while IFS='=' read -r key value; do
-    # Skip comments and empty lines
-    [[ "$key" =~ ^[[:space:]]*# ]] && continue
-    [[ -z "$key" ]] && continue
-    # Trim whitespace
-    key=$(echo "$key" | xargs)
-    value=$(echo "$value" | xargs | sed 's/^"//;s/"$//')
-    [[ -z "$key" ]] && continue
-    export "$key=$value"
-done < "$ENV_FILE"
-
-# ── Derive BASE_URL from LETSENCRYPT_DOMAIN ─────────────────────────────────
-
-if [[ -n "${LETSENCRYPT_DOMAIN:-}" ]]; then
-    # Try the external domain first; fallback to localhost if unreachable
-    if curl -sS -k --max-time 5 --output /dev/null "https://${LETSENCRYPT_DOMAIN}/health" 2>/dev/null; then
-        BASE_URL="https://${LETSENCRYPT_DOMAIN}"
-    else
-        echo "INFO: ${LETSENCRYPT_DOMAIN} not reachable, falling back to https://localhost"
-        BASE_URL="https://localhost"
-    fi
-else
-    BASE_URL="http://localhost:1235"
-fi
-export BASE_URL
-
-# ── Recover API_KEY automatically ───────────────────────────────────────────
-
-# Try docker compose exec first (reads from /root/.vllm-key/.api_key)
-API_KEY=""
-if command -v docker &>/dev/null; then
-    API_KEY=$(docker compose -f "${PROJECT_DIR}/docker-compose.yml" \
-        exec --no-deps vllm-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
-fi
-
-# Fallback: try docker exec directly (older compose v1)
-if [[ -z "$API_KEY" ]] && command -v docker &>/dev/null; then
-    API_KEY=$(docker exec vllm-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
-fi
-
-# Fallback: ask user
-if [[ -z "$API_KEY" ]]; then
-    echo "WARNING: Could not auto-detect API_KEY."
-    echo "         Docker may not be running or the container is not available."
-    echo -n "         Enter VLLM_API_KEY: " >&2
-    read -r API_KEY >&2
-    if [[ -z "$API_KEY" ]]; then
-        echo "ERROR: API_KEY is required. Set it via the running container or enter it manually."
-        exit 1
-    fi
-fi
-
-export API_KEY
+# Parse .env, resolve BASE_URL and recover the API key (shared with warmup.sh — lib.sh)
+parse_project_env "$ENV_FILE"
+resolve_base_url
+recover_api_key
 
 # ── Build MODEL_LABEL from MODEL_NAME + QUANTIZATION ────────────────────────
 
@@ -142,6 +86,8 @@ echo -e "Test\tIteration\tInputTokens\tOutputTokens\tTTFT_ms\tTotal_ms\tTPS" > "
 # ── Collect results ─────────────────────────────────────────────────────────
 
 ALL_RESULTS=""
+FAILED_TESTS=0
+FAILED_TEST_NAMES=""
 
 run_test() {
     local test_script="$1"
@@ -152,18 +98,24 @@ run_test() {
     echo "▶ Running: ${test_name}"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    local test_output
-    test_output=$("${test_script}" 2>&1) || {
-        echo "  ✗ FAILED (exit code $?)"
+    # Invoked via `bash` (git stores the tests without the exec bit).
+    # A failing test is recorded but does NOT abort the suite (set -e would otherwise
+    # exit here and skip report generation); the final exit code reflects failures.
+    local test_output rc=0
+    test_output=$(bash "${test_script}" 2>&1) || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        echo "  ✗ FAILED (exit code ${rc}) — continuing with remaining tests"
         echo "$test_output" | sed 's/^/    /'
-        return 1
-    }
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+        FAILED_TEST_NAMES="${FAILED_TEST_NAMES}${FAILED_TEST_NAMES:+, }${test_name}"
+        return 0
+    fi
 
-    # The test outputs TSV lines to stdout
-    echo "$test_output" | grep -E '^[a-z]' || true
-
-    # Append to TSV
-    echo "$test_output" | grep -E '^[a-z]' >> "$TSV_FILE" 2>/dev/null || true
+    # The test outputs TSV lines to stdout. Filter on the TSV shape (7 tab-separated
+    # columns, numeric iteration) rather than the first character — stderr merged
+    # into $test_output can contain lowercase lines (e.g. "curl: (6) ...") that
+    # would otherwise be written as spurious TSV rows.
+    echo "$test_output" | awk -F'\t' 'NF == 7 && $2 ~ /^[0-9]+$/ && $5 ~ /^[0-9]+$/ && $6 ~ /^[0-9]+$/ && $7 ~ /^[0-9.]+$/ { print }' | tee -a "$TSV_FILE" >/dev/null
 
     echo ""
 }
@@ -236,3 +188,9 @@ END {
 echo ""
 echo "Results saved to: ${RUN_DIR}/"
 echo ""
+
+# Exit non-zero if any test failed (the suite completed and the report was written).
+if [[ $FAILED_TESTS -gt 0 ]]; then
+    echo "NOTE: ${FAILED_TESTS} test(s) failed: ${FAILED_TEST_NAMES}"
+    exit 1
+fi

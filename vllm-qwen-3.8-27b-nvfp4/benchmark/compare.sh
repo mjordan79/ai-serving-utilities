@@ -17,8 +17,9 @@ if [[ $# -lt 2 ]]; then
     echo "Finds the latest TSV file in each directory and generates"
     echo "a side-by-side comparison report."
     echo ""
-    echo "Example:"
-    echo "  $0 results/nvidia-Qwen3.6-27B-NVFP4 results/unsloth-Qwen3.6-27B-NVFP4"
+    echo "Example (dir names are produced by run.sh — MODEL_NAME + ' (<quantization>)'"
+    echo "sanitized via tr: / → _, . → -, space → -):"
+    echo "  $0 'results/unsloth_Qwen3-8-27B-NVFP4-(compressed-tensors)' 'results/nvidia_Qwen3-6-27B-NVFP4-(modelopt)'"
     exit 1
 fi
 
@@ -122,7 +123,7 @@ echo "$DATA_A" | while IFS=$'\t' read -r test cnt_a in_a out_a ttft_a ttft_min_a
     tps_winner=$(awk "BEGIN { print (${tps_a} >= ${tps_b}) ? \"A\" : \"B\" }")
 
     ttft_delta=$(awk "BEGIN { d = (${ttft_a} - ${ttft_b}) / ${ttft_b} * 100; printf \"%+.1f%%\", d }")
-    total_delta=$(awk "BEGIN { d = (${total_a} - ${total_b}) / ${ttft_b} * 100; printf \"%+.1f%%\", d }")
+    total_delta=$(awk "BEGIN { d = (${total_a} - ${total_b}) / ${total_b} * 100; printf \"%+.1f%%\", d }")
     tps_delta=$(awk "BEGIN { d = (${tps_a} - ${tps_b}) / ${tps_b} * 100; printf \"%+.1f%%\", d }")
 
     cat >> "$REPORT" <<EOF

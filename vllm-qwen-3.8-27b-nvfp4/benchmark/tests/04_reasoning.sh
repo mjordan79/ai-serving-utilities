@@ -9,9 +9,11 @@ source "${SCRIPT_DIR}/../lib.sh"
 
 TEST_NAME="reasoning"
 
-# Build payload — include thinking kwargs if ENABLE_THINKING is set
+# Build payload — include thinking kwargs if ENABLE_THINKING is set.
+# chat_template_kwargs is the real vLLM/OpenAI body field; it overrides the
+# server-side --default-chat-template-kwargs for this request.
 if [[ "${ENABLE_THINKING:-true}" == "true" ]]; then
-    payload=$(printf '{"model":"%s","stream":true,"temperature":0.3,"max_tokens":2048,"messages":[{"role":"user","content":"A train leaves station A at 60 km/h. Another train leaves station B at 80 km/h. The stations are 420 km apart. They leave at the same time, heading toward each other. How long until they meet, and how far from station A is the meeting point? Show your work step by step."}],"extra_body":{"thinking":{"type":"enabled"}}}' "${MODEL_NAME:-auto}")
+    payload=$(printf '{"model":"%s","stream":true,"temperature":0.3,"max_tokens":2048,"messages":[{"role":"user","content":"A train leaves station A at 60 km/h. Another train leaves station B at 80 km/h. The stations are 420 km apart. They leave at the same time, heading toward each other. How long until they meet, and how far from station A is the meeting point? Show your work step by step."}],"chat_template_kwargs":{"enable_thinking":true}}' "${MODEL_NAME:-auto}")
 else
     payload=$(printf '{"model":"%s","stream":true,"temperature":0.3,"max_tokens":1024,"messages":[{"role":"user","content":"A train leaves station A at 60 km/h. Another train leaves station B at 80 km/h. The stations are 420 km apart. They leave at the same time, heading toward each other. How long until they meet, and how far from station A is the meeting point? Show your work step by step."}]}' "${MODEL_NAME:-auto}")
 fi

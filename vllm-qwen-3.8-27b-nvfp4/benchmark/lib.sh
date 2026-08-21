@@ -1,9 +1,86 @@
 #!/usr/bin/env bash
 # lib.sh — Shared library for all benchmark scripts.
-# Sourced by individual tests and run.sh. Handles curl, timing, metrics.
+# Sourced by individual tests, run.sh and warmup.sh. Handles curl, timing,
+# metrics, and shared configuration discovery.
 # Dependencies: bash, curl, gawk, date. No jq required.
 
 set -euo pipefail
+
+# ── Shared configuration discovery (used by run.sh and warmup.sh) ──────────
+# Callers must define PROJECT_DIR before invoking these functions.
+
+# Trim leading/trailing whitespace (pure bash — no xargs, no subshell).
+trim() {
+    local s="$1"
+    s="${s#"${s%%[![:space:]]*}"}"
+    s="${s%"${s##*[![:space:]]}"}"
+    printf '%s' "$s"
+}
+
+# Parse KEY=VALUE pairs from the project's .env and export them.
+# Skips comments and empty lines; strips surrounding double quotes from values.
+parse_project_env() {
+    local env_file="$1" key value
+    [[ -f "$env_file" ]] || { echo "ERROR: Project .env not found at ${env_file}" >&2; return 1; }
+    while IFS='=' read -r key value; do
+        key=$(trim "$key")
+        [[ "$key" == \#* ]] && continue
+        [[ -z "$key" ]] && continue
+        value=$(trim "$value")
+        value="${value#\"}"
+        value="${value%\"}"
+        export "$key=$value"
+    done < "$env_file"
+}
+
+# Resolve BASE_URL: external domain if reachable, otherwise the direct
+# HTTP endpoint published by docker-compose.yml (127.0.0.1:1235).
+resolve_base_url() {
+    if [[ -n "${LETSENCRYPT_DOMAIN:-}" ]]; then
+        if curl -sS -k --max-time 5 --output /dev/null "https://${LETSENCRYPT_DOMAIN}/health" 2>/dev/null; then
+            BASE_URL="https://${LETSENCRYPT_DOMAIN}"
+        else
+            echo "INFO: ${LETSENCRYPT_DOMAIN} not reachable, falling back to http://localhost:1235"
+            BASE_URL="http://localhost:1235"
+        fi
+    else
+        BASE_URL="http://localhost:1235"
+    fi
+    export BASE_URL
+}
+
+# Recover the vLLM API key from the running container; prompt as last resort.
+# NOTE: docker output is captured via a temp file, not command substitution —
+# under WSL interop (docker.exe), substitution/pipe capture can come back empty
+# while file redirect works reliably.
+recover_api_key() {
+    API_KEY=""
+    local keyfile
+    keyfile=$(mktemp 2>/dev/null || printf '/tmp/vllm_key_%s' "$$")
+    if command -v docker >/dev/null 2>&1; then
+        docker exec vllm-server cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+            && API_KEY=$(<"$keyfile")
+    fi
+    if [[ -z "$API_KEY" ]] && command -v docker >/dev/null 2>&1; then
+        # Fallback: docker compose (service name via compose file)
+        docker compose -f "${PROJECT_DIR}/docker-compose.yml" \
+            exec -T vllm-server cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+            && API_KEY=$(<"$keyfile")
+    fi
+    rm -f "$keyfile"
+    if [[ -z "$API_KEY" ]] && command -v docker >/dev/null 2>&1; then
+        # Fallback: docker exec directly (older compose)
+        API_KEY=$(docker exec vllm-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
+    fi
+    if [[ -z "$API_KEY" ]]; then
+        echo "WARNING: Could not auto-detect API_KEY." >&2
+        echo "         Docker may not be running or the container is not available." >&2
+        echo -n "         Enter VLLM_API_KEY: " >&2
+        read -r API_KEY
+    fi
+    [[ -n "$API_KEY" ]] || { echo "ERROR: API_KEY is required." >&2; return 1; }
+    export API_KEY
+}
 
 # ── JSON helpers (replaces jq) ──────────────────────────────────────────────
 
@@ -217,48 +294,6 @@ run_chat_stream() {
     fi
 }
 
-# ── Curl wrapper: non-streaming chat completion ─────────────────────────────
-# For simpler single-response tests where streaming isn't needed.
-
-run_chat_nostream() {
-    local payload="$1"
-    local tmpfile
-    tmpfile=$(mktemp)
-
-    local start_ns
-    start_ns=$(now_ns)
-
-    curl -sS -k --max-time "${CURL_TIMEOUT:-600}" \
-        -H "Content-Type: application/json" \
-        -H "Authorization: Bearer ${API_KEY}" \
-        -d "$payload" \
-        "${BASE_URL}/v1/chat/completions" \
-        > "$tmpfile" 2>/dev/null || {
-            local rc=$?
-            rm -f "$tmpfile"
-            echo "ERROR: curl failed with exit code $rc" >&2
-            return 1
-        }
-
-    local end_ns
-    end_ns=$(now_ns)
-
-    METRIC_TOTAL_MS=$(( (end_ns - start_ns) / 1000000 ))
-    METRIC_TTFT_MS=$METRIC_TOTAL_MS  # Non-streaming: TTFT ≈ total
-    METRIC_PROMPT_TOKENS=$(json_get_value "$(cat "$tmpfile")" "prompt_tokens")
-    METRIC_GEN_TOKENS=$(json_get_value "$(cat "$tmpfile")" "completion_tokens")
-    METRIC_PROMPT_TOKENS=${METRIC_PROMPT_TOKENS:-0}
-    METRIC_GEN_TOKENS=${METRIC_GEN_TOKENS:-0}
-    METRIC_INPUT_TOKENS=$METRIC_PROMPT_TOKENS
-    METRIC_OUTPUT_TOKENS=$METRIC_GEN_TOKENS
-
-    if [[ $METRIC_TOTAL_MS -gt 0 ]]; then
-        METRIC_TPS=$(awk "BEGIN { printf \"%.2f\", ${METRIC_OUTPUT_TOKENS} / (${METRIC_TOTAL_MS} / 1000.0) }")
-    fi
-
-    rm -f "$tmpfile"
-}
-
 # ── Report helpers ───────────────────────────────────────────────────────────
 
 # Print a single test result line (TSV format for easy parsing)
@@ -321,21 +356,4 @@ EOF
 EOF
 }
 
-# Compute average and stddev for a column from TSV data
-compute_avg() {
-    local col="$1"
-    local data="$2"
-    echo "$data" | awk -F'\t' -v c="$col" '{ sum += $c; n++ } END { if(n>0) printf "%.2f", sum/n; else print "N/A" }'
-}
 
-compute_min() {
-    local col="$1"
-    local data="$2"
-    echo "$data" | awk -F'\t' -v c="$col" 'BEGIN{m=999999999} { if($c+0 < m) m=$c+0 } END { printf "%d", m }'
-}
-
-compute_max() {
-    local col="$1"
-    local data="$2"
-    echo "$data" | awk -F'\t' -v c="$col" 'BEGIN{m=0} { if($c+0 > m) m=$c+0 } END { printf "%d", m }'
-}
