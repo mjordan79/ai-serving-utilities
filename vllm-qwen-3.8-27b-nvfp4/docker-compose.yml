@@ -30,46 +30,45 @@ services:
               capabilities: [gpu]
 
     environment:
-      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=0
-      - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR="/tmp/flashinfer_autotune_cache"
+      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+      - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR
 
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
-      - MODEL_NAME=${MODEL_NAME:-unsloth/Qwen3.8-27B-NVFP4}
+      - MODEL_NAME
       # Pass-through: if set in .env the entrypoint uses this key; if empty the
       # entrypoint generates and persists sk-<uuid> in the vllm-keys volume.
-      - VLLM_API_KEY=${VLLM_API_KEY:-}
-      - ENABLE_API_KEY=true
-      - DTYPE=auto
-      - SAFETENSORS_LOAD_STRATEGY=prefetch
-      - TP_SIZE=1
-      - ATTENTION_BACKEND=flashinfer
-      - PERFORMANCE_MODE=interactivity
-      - LANGUAGE_MODEL_ONLY=false
-      - SKIP_MM_PROFILING=true
-      - KV_CACHE_DTYPE=fp8_e4m3
-      - GPU_MEMORY_UTILIZATION=0.92
-      - MAX_MODEL_LEN=${MAX_MODEL_LEN:-116800}
-      - MAX_NUM_SEQS=1
-      - MAX_NUM_BATCHED_TOKENS=6144
-      - ENABLE_CHUNKED_PREFILL=true
-      - ENABLE_PREFIX_CACHING=true
-      - ENABLE_HYBRID_KV_CACHE_MANAGER=true
-      - REASONING_PARSER=qwen3
-      - DEFAULT_ENABLE_THINKING=true
-      - ENABLE_AUTO_TOOL_CHOICE=true
-      - TOOL_CALL_PARSER=qwen3_coder
-      # Default fallback = Unsloth variant (matches MODEL_NAME default and docs).
-      # NVIDIA variant: set QUANTIZATION=modelopt + HF_CACHE_VOLUME=hf-cache-nvidia in .env.
-      - QUANTIZATION=${QUANTIZATION:-compressed-tensors}
-      - ENABLE_MTP=true
-      - MTP_NUM_SPECULATIVE_TOKENS=2
-      - TRUST_REMOTE_CODE=true
-      - ENABLE_PROMPT_TOKENS_DETAILS=true
-      - ENABLE_REQUEST_METRICS=true
-      - PORT=8000
+      - VLLM_API_KEY
+      - ENABLE_API_KEY
+      - DTYPE
+      - SAFETENSORS_LOAD_STRATEGY
+      - TP_SIZE
+      - ATTENTION_BACKEND
+      - PERFORMANCE_MODE
+      - LANGUAGE_MODEL_ONLY
+      - SKIP_MM_PROFILING
+      - KV_CACHE_DTYPE
+      - GPU_MEMORY_UTILIZATION
+      - MAX_MODEL_LEN
+      - MAX_NUM_SEQS
+      - MAX_NUM_BATCHED_TOKENS
+      - ENABLE_CHUNKED_PREFILL
+      - ENABLE_PREFIX_CACHING
+      - ENABLE_HYBRID_KV_CACHE_MANAGER
+      - REASONING_PARSER
+      - DEFAULT_ENABLE_THINKING
+      - ENABLE_AUTO_TOOL_CHOICE
+      - TOOL_CALL_PARSER
+      - QUANTIZATION
+      - ENABLE_MTP
+      - MTP_NUM_SPECULATIVE_TOKENS
+      - TRUST_REMOTE_CODE
+      - ENABLE_PROMPT_TOKENS_DETAILS
+      - ENABLE_REQUEST_METRICS
+      - DISABLE_LOG_STATS
+      - PORT
       # --- HuggingFace ---
-      - HF_TOKEN=${HF_TOKEN}
+      - HF_TOKEN
 
     volumes:
       # Default fallback = Unsloth cache (matches documented default variant).

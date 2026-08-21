@@ -200,6 +200,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
 | `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set in `.env` to use a fixed key; if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
+| `DISABLE_LOG_STATS` | `false` | Disable periodic vLLM throughput statistics; requires `ENABLE_REQUEST_METRICS=false` |
 | `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Detailed prompt-token breakdown in usage |
 | `PORT` | `8000` | In-container port (host mapping `1235:8000`) |
 

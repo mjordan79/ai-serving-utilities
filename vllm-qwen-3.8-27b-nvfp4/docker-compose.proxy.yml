@@ -8,8 +8,8 @@ services:
 
     # Pass Let's Encrypt vars to vllm (read by acme-companion via Docker socket)
     environment:
-      - LETSENCRYPT_HOST=${LETSENCRYPT_DOMAIN:-}
-      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL:-}
+      - LETSENCRYPT_HOST
+      - LETSENCRYPT_EMAIL
 
   docker-gen:
     image: nginxproxy/docker-gen:0.17.2
@@ -41,7 +41,7 @@ services:
       - "443:443"
 
     environment:
-      - LETSENCRYPT_DOMAIN=${LETSENCRYPT_DOMAIN:-}
+      - LETSENCRYPT_DOMAIN
 
     networks:
       - vllm-net

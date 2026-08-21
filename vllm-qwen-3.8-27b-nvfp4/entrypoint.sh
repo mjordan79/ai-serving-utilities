@@ -3,6 +3,18 @@ set -e
 
 API_KEY_FILE="/root/.vllm-key/.api_key"
 
+# Runtime defaults live here so Compose only passes explicit overrides.
+export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS="${VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS:-0}"
+export VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR="${VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR:-/tmp/flashinfer_autotune_cache}"
+ENABLE_API_KEY="${ENABLE_API_KEY:-true}"
+ENABLE_REQUEST_METRICS="${ENABLE_REQUEST_METRICS:-true}"
+DISABLE_LOG_STATS="${DISABLE_LOG_STATS:-false}"
+
+if [ "$ENABLE_REQUEST_METRICS" = "true" ] && [ "$DISABLE_LOG_STATS" = "true" ]; then
+  echo "ERROR: ENABLE_REQUEST_METRICS=true requires DISABLE_LOG_STATS=false." >&2
+  exit 1
+fi
+
 if [ -n "$HF_TOKEN" ]; then
   export HF_TOKEN
 fi
@@ -30,7 +42,7 @@ if [ "${ENABLE_API_KEY:-false}" = "true" ]; then
 fi
 
 # --- Build vLLM arguments from environment variables ---
-# Every flag has a default here; override in docker-compose.yml to change.
+# Every flag has a default here; override through the container environment to change.
 
 # Model
 MODEL_NAME="${MODEL_NAME:-unsloth/Qwen3.8-27B-NVFP4}"
@@ -59,7 +71,6 @@ ENABLE_PREFIX_CACHING="${ENABLE_PREFIX_CACHING:-true}"
 ENABLE_HYBRID_KV_CACHE_MANAGER="${ENABLE_HYBRID_KV_CACHE_MANAGER:-true}"
 ENABLE_AUTO_TOOL_CHOICE="${ENABLE_AUTO_TOOL_CHOICE:-true}"
 ENABLE_PROMPT_TOKENS_DETAILS="${ENABLE_PROMPT_TOKENS_DETAILS:-true}"
-ENABLE_REQUEST_METRICS="${ENABLE_REQUEST_METRICS:-true}"
 
 # Parsers
 REASONING_PARSER="${REASONING_PARSER:-qwen3}"
@@ -72,7 +83,7 @@ SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-true}"
 # Default = Unsloth variant (compressed-tensors). NVIDIA variant: QUANTIZATION=modelopt in .env.
 QUANTIZATION="${QUANTIZATION:-compressed-tensors}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
-LANGUAGE_MODEL_ONLY="${LANGUAGE_MODEL_ONLY:-true}"
+LANGUAGE_MODEL_ONLY="${LANGUAGE_MODEL_ONLY:-false}"
 
 # API
 PORT="${PORT:-8000}"
@@ -111,6 +122,11 @@ fi
 REQUEST_METRICS_ARGS=()
 if [ "$ENABLE_REQUEST_METRICS" = "true" ]; then
   REQUEST_METRICS_ARGS=(--enable-per-request-metrics)
+fi
+
+DISABLE_LOG_STATS_ARGS=()
+if [ "$DISABLE_LOG_STATS" = "true" ]; then
+  DISABLE_LOG_STATS_ARGS=(--disable-log-stats)
 fi
 
 SKIP_MM_ARGS=()
@@ -156,5 +172,6 @@ exec vllm serve "$MODEL_NAME" \
   "${TRUST_ARGS[@]}" \
   "${PROMPT_TOKENS_ARGS[@]}" \
   "${REQUEST_METRICS_ARGS[@]}" \
+  "${DISABLE_LOG_STATS_ARGS[@]}" \
   --uvicorn-log-level warning \
   --port "$PORT"
