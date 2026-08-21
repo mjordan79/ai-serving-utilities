@@ -26,9 +26,10 @@ fi
 DIR_A="$1"
 DIR_B="$2"
 
-# Find latest TSV in each dir
-TSV_A=$(ls -t "${DIR_A}"/results_*.tsv 2>/dev/null | head -1)
-TSV_B=$(ls -t "${DIR_B}"/results_*.tsv 2>/dev/null | head -1)
+# Find latest TSV in each dir. `|| true`: with pipefail, a failing `ls`
+# (no match) would otherwise abort via set -e before the error branch runs.
+TSV_A=$(ls -t "${DIR_A}"/results_*.tsv 2>/dev/null | head -1 || true)
+TSV_B=$(ls -t "${DIR_B}"/results_*.tsv 2>/dev/null | head -1 || true)
 
 if [[ -z "${TSV_A:-}" ]]; then
     echo "ERROR: No TSV found in $DIR_A"
@@ -79,10 +80,12 @@ aggregate_tsv() {
         for (i = 1; i <= n; i++) {
             t = sorted[i]
             c = count[t]
-            printf "%s\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.2f\t%.2f\t%.0f\t%.0f\n", \
+            # 13 columns: test, count, in_avg, out_avg, ttft_avg, ttft_min, ttft_max,
+            # total_avg, tps_avg, tps_max, tps_min, total_min, total_max
+            printf "%s\t%d\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.0f\t%.2f\t%.2f\t%.2f\t%.0f\t%.0f\n", \
                 t, c, sum_in[t]/c, sum_out[t]/c, \
                 sum_ttft[t]/c, min_ttft[t], max_ttft[t], \
-                sum_total[t]/c, sum_tps[t], max_tps[t], min_tps[t], \
+                sum_total[t]/c, sum_tps[t]/c, max_tps[t], min_tps[t], \
                 min_total[t], max_total[t]
         }
     }'

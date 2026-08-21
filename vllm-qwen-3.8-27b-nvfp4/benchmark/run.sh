@@ -68,16 +68,31 @@ TSV_FILE="${RUN_DIR}/results_${TIMESTAMP}.tsv"
 MD_FILE="${RUN_DIR}/report_${TIMESTAMP}.md"
 
 # ── Header ──────────────────────────────────────────────────────────────────
+# print_box <title> <line>... — draws a box wide enough for the longest line,
+# so alignment never breaks regardless of content length.
+print_box() {
+    local title="$1"; shift
+    local max=${#title} L
+    for L in "$@"; do
+        (( ${#L} > max )) && max=${#L}
+    done
+    local bar; bar=$(printf '═%.0s' $(seq $((max + 3))))
+    echo "╔${bar}╗"
+    printf '║  %-*s ║\n' "$max" "$title"
+    echo "╠${bar}╣"
+    local line
+    for line in "$@"; do
+        printf '║  %-*s ║\n' "$max" "$line"
+    done
+    echo "╚${bar}╝"
+}
 
 echo ""
-echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║  BENCHMARK SUITE                                        ║"
-echo "╠═══════════════════════════════════════════════════════════╣"
-echo "║  Target : ${BASE_URL}"
-echo "║  Model  : ${MODEL_LABEL:-unknown}"
-echo "║  Iters  : ${ITERATIONS}"
-echo "║  Output : ${TSV_FILE}"
-echo "╚═══════════════════════════════════════════════════════════╝"
+print_box "BENCHMARK SUITE" \
+    "Target : ${BASE_URL}" \
+    "Model  : ${MODEL_LABEL:-unknown}" \
+    "Iters  : ${ITERATIONS}" \
+    "Output : ${MODEL_SAFE}"
 echo ""
 
 # Write TSV header
@@ -140,12 +155,9 @@ fi
 
 # ── Generate report ─────────────────────────────────────────────────────────
 
-echo "╔═══════════════════════════════════════════════════════════╗"
-echo "║  GENERATING REPORT                                      ║"
-echo "╠═══════════════════════════════════════════════════════════╣"
-echo "║  TSV : ${TSV_FILE}"
-echo "║  MD  : ${MD_FILE}"
-echo "╚═══════════════════════════════════════════════════════════╝"
+print_box "GENERATING REPORT" \
+    "TSV : $(basename "$TSV_FILE")" \
+    "MD  : $(basename "$MD_FILE")"
 
 # Generate markdown report
 {
