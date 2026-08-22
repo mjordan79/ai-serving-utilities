@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
 
-    container_name: muse-server
+    container_name: vllm-museglimmer-server
     restart: unless-stopped
 
     healthcheck:
@@ -36,8 +36,6 @@ services:
       - VLLM_USE_V2_MODEL_RUNNER=0
       # Disable mm processor cache to avoid "video placeholders" bug on vLLM dev build
       - EXTRA_ARGS_STR=--mm-processor-cache-gb 0
-      # Auth off for local testing; enable via ENABLE_API_KEY=true if needed
-      - ENABLE_API_KEY=false
 
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -45,6 +43,7 @@ services:
       # Pass-through: if set in .env the entrypoint uses this key; if empty the
       # entrypoint generates and persists sk-<uuid> in the vllm-muse-keys volume.
       - VLLM_API_KEY
+      - ENABLE_API_KEY=false
       - DTYPE
       - SAFETENSORS_LOAD_STRATEGY
       - TP_SIZE
@@ -76,9 +75,6 @@ services:
       # --- HuggingFace ---
       - HF_TOKEN
 
-    # The project name above is pinned, so this named volume is deterministic:
-    # <project>_<volume>. It holds the model snapshot — never run
-    # `docker compose down -v` (that deletes it and re-downloads 22 GB).
     volumes:
       - hf-cache-museglimmer:/root/.cache/huggingface
       - vllm-muse-keys:/root/.vllm-key
