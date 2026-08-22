@@ -79,7 +79,6 @@ services:
     ports:
       - "1235:8000"
 
-    shm_size: "16gb"
     ipc: host
 
 networks:
