@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: Dockerfile
 
-    container_name: vllm-server
+    container_name: vllm-qwen-server
     restart: unless-stopped
 
     healthcheck:
@@ -86,6 +86,11 @@ networks:
     attachable: true
 
 volumes:
+  # Explicit names = deterministic volumes (the project name is pinned above),
+  # so state survives even if the folder or compose file moves.
   hf-cache-nvidia:
+    name: vllm-qwen-38-27b-nvfp4_hf-cache-nvidia
   hf-cache-unsloth:
+    name: vllm-qwen-38-27b-nvfp4_hf-cache-unsloth
   vllm-keys:
+    name: vllm-qwen-38-27b-nvfp4_vllm-keys
