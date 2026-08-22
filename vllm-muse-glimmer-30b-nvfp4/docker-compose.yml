@@ -76,7 +76,7 @@ services:
       - HF_TOKEN
 
     volumes:
-      - hf-cache-museglimmer:/root/.cache/huggingface
+      - ${HF_CACHE_VOLUME:-hf-cache-museglimmer}:/root/.cache/huggingface
       - vllm-muse-keys:/root/.vllm-key
 
     ports:

@@ -1,8 +1,5 @@
 # Reverse Proxy + HTTPS overlay
 # Usage: docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
-#
-# NOTE: this overlay binds host ports 80/443. It cannot coexist with the
-# Qwen proxy overlay (same ports) — stop the other project's proxy first.
 
 services:
   vllm:
