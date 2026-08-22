@@ -30,8 +30,8 @@ services:
               capabilities: [gpu]
 
     environment:
-      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS=1
-      - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR=/tmp/flashinfer_autotune_cache
+      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+      - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR
       # V2 model runner UVA buffer check fails on WSL2 → force V1 runner
       - VLLM_USE_V2_MODEL_RUNNER=0
       # Disable mm processor cache to avoid "video placeholders" bug on vLLM dev build

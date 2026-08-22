@@ -19,7 +19,7 @@ if [ -n "$HF_TOKEN" ]; then
   export HF_TOKEN
 fi
 
-# API key: ENABLE_API_KEY=true (default) → auth required.
+# API key: enable with ENABLE_API_KEY=true.
 # If enabled and it doesn't exist, generate a persistent UUID.
 # If enabled and it exists, reuse the saved token.
 # If disabled, no authentication (dev local).
