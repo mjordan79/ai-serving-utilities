@@ -43,7 +43,7 @@ services:
       # Pass-through: if set in .env the entrypoint uses this key; if empty the
       # entrypoint generates and persists sk-<uuid> in the vllm-muse-keys volume.
       - VLLM_API_KEY
-      - ENABLE_API_KEY=false
+      - ENABLE_API_KEY
       - DTYPE
       - SAFETENSORS_LOAD_STRATEGY
       - TP_SIZE

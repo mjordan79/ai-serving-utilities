@@ -116,7 +116,7 @@ docker compose logs | grep "Generated API key"
 Save this value — it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
 
 ```bash
-docker exec muse-server cat /root/.vllm-key/.api_key
+docker exec vllm-museglimmer-server cat /root/.vllm-key/.api_key
 ```
 
 To disable authentication, set `ENABLE_API_KEY=false`.
