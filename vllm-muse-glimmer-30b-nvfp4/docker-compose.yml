@@ -34,8 +34,6 @@ services:
       - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR=/tmp/flashinfer_autotune_cache
       # V2 model runner UVA buffer check fails on WSL2 → force V1 runner
       - VLLM_USE_V2_MODEL_RUNNER=0
-      # FlashInfer UVA check fails on WSL2 with this image → FlashAttention
-      - ATTENTION_BACKEND=FLASHINFER
       # Disable mm processor cache to avoid "video placeholders" bug on vLLM dev build
       - EXTRA_ARGS_STR=--mm-processor-cache-gb 0
       # Auth off for local testing; enable via ENABLE_API_KEY=true if needed
@@ -50,6 +48,7 @@ services:
       - DTYPE
       - SAFETENSORS_LOAD_STRATEGY
       - TP_SIZE
+      - ATTENTION_BACKEND
       - PERFORMANCE_MODE
       - KV_CACHE_DTYPE
       - GPU_MEMORY_UTILIZATION
