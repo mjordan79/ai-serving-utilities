@@ -24,7 +24,7 @@ fi
 # If enabled and it exists, reuse the saved token.
 # If disabled, no authentication (dev local).
 API_KEY_ARGS=()
-if [ "${ENABLE_API_KEY:-false}" = "true" ]; then
+if [ "$ENABLE_API_KEY" = "true" ]; then
   if [ -z "$VLLM_API_KEY" ]; then
     if [ -f "$API_KEY_FILE" ]; then
       VLLM_API_KEY=$(cat "$API_KEY_FILE")
