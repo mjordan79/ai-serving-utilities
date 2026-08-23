@@ -32,18 +32,32 @@ log() {
 }
 
 # Send a warmup request. Phases are best-effort (no abort on failure), but HTTP
-# errors are logged — curl -f makes 4xx/5xx fail so payload bugs are not silent.
+# errors are logged with code and body — a 401 must be visible, not silent.
+WARMUP_FAILURES=0
 post() {
     local payload="$1" max_time="$2" label="$3"
-    if curl -fsS -k --max-time "$max_time" \
+    local bodyfile codefile
+    bodyfile=$(mktemp 2>/dev/null || printf '/tmp/warmup_body_%s' "$$")
+    codefile=$(mktemp 2>/dev/null || printf '/tmp/warmup_code_%s' "$$")
+    local rc=0
+    curl -sS -k --max-time "$max_time" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${API_KEY}" \
-        -d "$payload" "${BASE_URL}/v1/chat/completions" >/dev/null 2>&1; then
+        -d "$payload" \
+        -o "$bodyfile" -w '%{http_code}' > "$codefile" \
+        "${BASE_URL}/v1/chat/completions" 2>/dev/null || rc=$?
+    local http_code
+    http_code=$(cat "$codefile" 2>/dev/null || echo "000")
+    if [[ $rc -eq 0 && "$http_code" == "200" ]]; then
         log "  ✓ ${label}"
     else
-        log "  ⚠ ${label} FAILED (HTTP error or timeout)"
+        local body
+        body=$(head -c 120 "$bodyfile" 2>/dev/null || true)
+        log "  ⚠ ${label} FAILED (HTTP ${http_code}: ${body})"
+        WARMUP_FAILURES=$((WARMUP_FAILURES + 1))
         # Not fatal: remaining phases may still compile useful kernels.
     fi
+    rm -f "$bodyfile" "$codefile"
 }
 
 log "═══════════════════════════════════════════════════════════"
@@ -126,6 +140,12 @@ post "$payload" 60 "Streaming path"
 
 # ── Done ────────────────────────────────────────────────────────────────────
 log "═══════════════════════════════════════════════════════════"
-log "  WARMUP COMPLETE — Model is ready for benchmarking"
-log "═══════════════════════════════════════════════════════════"
-log "Log: ${WARMUP_LOG}"
+if [[ $WARMUP_FAILURES -eq 0 ]]; then
+    log "  WARMUP COMPLETE — Model is ready for benchmarking"
+    log "Log: ${WARMUP_LOG}"
+else
+    log "  WARMUP FAILED — ${WARMUP_FAILURES} phase(s) did not succeed (see log)."
+    log "  The model is NOT confirmed ready for benchmarking."
+    log "Log: ${WARMUP_LOG}"
+    exit 1
+fi

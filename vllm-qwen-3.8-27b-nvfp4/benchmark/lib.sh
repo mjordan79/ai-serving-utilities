@@ -27,6 +27,7 @@ parse_project_env() {
         [[ "$key" == \#* ]] && continue
         [[ -z "$key" ]] && continue
         value=$(trim "$value")
+        value="${value%$'\r'}"
         value="${value#\"}"
         value="${value%\"}"
         export "$key=$value"
@@ -49,34 +50,38 @@ resolve_base_url() {
     export BASE_URL
 }
 
-# Recover the vLLM API key from the running container; prompt as last resort.
+# Recover the vLLM API key. Resolution order:
+#   1. Live from the running container (docker exec → docker compose exec).
+#   2. VLLM_API_KEY from the project .env (fixed-key convention).
+#   3. Interactive prompt as last resort.
 # NOTE: docker output is captured via a temp file, not command substitution —
 # under WSL interop (docker.exe), substitution/pipe capture can come back empty
 # while file redirect works reliably.
 recover_api_key() {
     API_KEY=""
-    local keyfile
-    keyfile=$(mktemp 2>/dev/null || printf '/tmp/vllm_key_%s' "$$")
     if command -v docker >/dev/null 2>&1; then
+        local keyfile
+        keyfile=$(mktemp 2>/dev/null || printf '/tmp/vllm_key_%s' "$$")
         docker exec vllm-qwen-server cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
             && API_KEY=$(<"$keyfile")
+        if [[ -z "$API_KEY" ]]; then
+            # Fallback: docker compose (service name via compose file)
+            docker compose -f "${PROJECT_DIR}/docker-compose.yml" \
+                exec -T vllm cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+                && API_KEY=$(<"$keyfile")
+        fi
+        rm -f "$keyfile"
     fi
-    if [[ -z "$API_KEY" ]] && command -v docker >/dev/null 2>&1; then
-        # Fallback: docker compose (service name via compose file)
-        docker compose -f "${PROJECT_DIR}/docker-compose.yml" \
-            exec -T vllm cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
-            && API_KEY=$(<"$keyfile")
-    fi
-    rm -f "$keyfile"
-    if [[ -z "$API_KEY" ]] && command -v docker >/dev/null 2>&1; then
-        # Fallback: docker exec directly (older compose)
-        API_KEY=$(docker exec vllm-qwen-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
+    if [[ -z "$API_KEY" ]] && [[ -n "${VLLM_API_KEY:-}" ]]; then
+        API_KEY="$VLLM_API_KEY"
+        echo "INFO: Using VLLM_API_KEY from .env (docker recovery unavailable)." >&2
     fi
     if [[ -z "$API_KEY" ]]; then
         echo "WARNING: Could not auto-detect API_KEY." >&2
         echo "         Docker may not be running or the container is not available." >&2
+        echo "         Set VLLM_API_KEY in the project .env to skip this prompt." >&2
         echo -n "         Enter VLLM_API_KEY: " >&2
-        read -r API_KEY
+        read -r API_KEY || API_KEY=""
     fi
     [[ -n "$API_KEY" ]] || { echo "ERROR: API_KEY is required." >&2; return 1; }
     export API_KEY
@@ -231,23 +236,28 @@ run_chat_stream() {
 
     local start_ns
     start_ns=$(now_ns)
-    local tmpfile
+    local tmpfile codefile
     tmpfile=$(mktemp)
+    codefile=$(mktemp)
 
+    local rc=0
     curl -sS -k --max-time "${CURL_TIMEOUT:-600}" \
         -H "Content-Type: application/json" \
         -H "Authorization: Bearer ${API_KEY}" \
         -d "$nostream_payload" \
-        "${BASE_URL}/v1/chat/completions" \
-        > "$tmpfile" 2>/dev/null || {
-            local rc=$?
-            local error_msg
-            error_msg=$(cat "$tmpfile" 2>/dev/null || echo "unknown error")
-            rm -f "$tmpfile"
-            echo "ERROR: curl failed with exit code $rc" >&2
-            echo "ERROR: $error_msg" >&2
-            return 1
-        }
+        -o "$tmpfile" \
+        -w '%{http_code}' > "$codefile" \
+        "${BASE_URL}/v1/chat/completions" 2>/dev/null || rc=$?
+    local status
+    status=$(cat "$codefile" 2>/dev/null || echo "")
+    rm -f "$codefile"
+    if [[ $rc -ne 0 || "${status:-000}" != "200" ]]; then
+        local error_msg
+        error_msg=$(head -c 200 "$tmpfile" 2>/dev/null || true)
+        rm -f "$tmpfile"
+        echo "ERROR: HTTP ${status:-curl-failed} (rc=$rc): ${error_msg}" >&2
+        return 1
+    fi
 
     local end_ns
     end_ns=$(now_ns)

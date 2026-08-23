@@ -36,7 +36,7 @@ All configuration is auto-detected from the project's `.env` file (`../.env`):
 | .env Variable | Auto-Derived | Used For |
 |---------------|--------------|----------|
 | `LETSENCRYPT_DOMAIN` | → `BASE_URL` | `https://<domain>` if the domain resolves, else `http://localhost:1235` |
-| *(not from .env)* | → `API_KEY` | Recovered live from the running container via `docker compose exec` (falls back to `docker exec`, then an interactive prompt). The `.env` `VLLM_API_KEY` is **never read** by the scripts |
+| *(docker → .env)* | → `API_KEY` | Recovered live from the running container via `docker exec` / `docker compose exec`; if docker is unreachable (e.g. WSL without interop), falls back to `VLLM_API_KEY` from `.env`, then an interactive prompt |
 | `MODEL_NAME` | → `MODEL_LABEL` | Result directory naming |
 | `QUANTIZATION` | → `MODEL_LABEL` | Appended to model label (e.g., `nvidia/Qwen3.6-27B-NVFP4 (modelopt)`) |
 
