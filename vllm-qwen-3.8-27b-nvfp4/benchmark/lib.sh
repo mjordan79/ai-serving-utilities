@@ -58,19 +58,19 @@ recover_api_key() {
     local keyfile
     keyfile=$(mktemp 2>/dev/null || printf '/tmp/vllm_key_%s' "$$")
     if command -v docker >/dev/null 2>&1; then
-        docker exec vllm-server cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+        docker exec vllm-qwen-server cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
             && API_KEY=$(<"$keyfile")
     fi
     if [[ -z "$API_KEY" ]] && command -v docker >/dev/null 2>&1; then
         # Fallback: docker compose (service name via compose file)
         docker compose -f "${PROJECT_DIR}/docker-compose.yml" \
-            exec -T vllm-server cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+            exec -T vllm cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
             && API_KEY=$(<"$keyfile")
     fi
     rm -f "$keyfile"
     if [[ -z "$API_KEY" ]] && command -v docker >/dev/null 2>&1; then
         # Fallback: docker exec directly (older compose)
-        API_KEY=$(docker exec vllm-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
+        API_KEY=$(docker exec vllm-qwen-server cat /root/.vllm-key/.api_key 2>/dev/null || true)
     fi
     if [[ -z "$API_KEY" ]]; then
         echo "WARNING: Could not auto-detect API_KEY." >&2

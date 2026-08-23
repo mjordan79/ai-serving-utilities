@@ -54,6 +54,8 @@ LETSENCRYPT_DOMAIN=my-domain.duckdns.org
 LETSENCRYPT_EMAIL=you@example.com
 ```
 
+To pin a fixed API key (optional) instead of the auto-generated one, add `VLLM_API_KEY=sk-...` to `.env` (documented in `.env.example`). Keep the value in the gitignored `.env`, never in compose.
+
 > `.env` is listed in `.gitignore` — never commit it.
 
 ### 2. Build and start
@@ -87,6 +89,8 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme-co
 Once the certificate is ready, access the API at `https://<your-domain.duckdns.org>`.
 
 > **Without the proxy overlay**, the API is exposed directly on port `1235` (HTTP). Compose binds this port on `0.0.0.0` by default, so it is reachable from the LAN, not only localhost. It is Bearer-authenticated, but use the TLS proxy for anything non-local.
+>
+> **Port 80/443 conflict:** if the sibling `vllm-muse-glimmer-30b-nvfp4` deployment runs its proxy overlay at the same time, both stacks claim 80/443 on the same host. Run one proxy at a time. The direct-mode ports do not conflict (Qwen `1235`, Muse `1236`).
 
 ### 3. Get your API key
 
@@ -99,17 +103,18 @@ docker compose logs | grep "Generated API key"
 Save this value — it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
 
 ```bash
-docker exec vllm-server cat /root/.vllm-key/.api_key
+docker exec vllm-qwen-server cat /root/.vllm-key/.api_key
 ```
 
-To disable authentication, set `ENABLE_API_KEY=false` in `docker-compose.yml`.
+To disable authentication, edit `docker-compose.yml` and change the pass-through entry `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` (`.env` only holds the variables in `.env.example`; tuning is done in the compose file).
 
 ### 4. Verify
 
 **Direct mode (default):**
 
 ```bash
-curl http://localhost:1235/v1/models
+curl http://localhost:1235/v1/models \
+  -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 **Proxy mode (with overlay):**
@@ -171,7 +176,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
-| `GPU_MEMORY_UTILIZATION` | `0.92` | Fraction of usable VRAM (0.0–1.0) |
+| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
@@ -187,9 +192,10 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 | Variable | Default | Description |
 |---|---|---|
-| `LANGUAGE_MODEL_ONLY` | `false` | Deliberate override of the entrypoint default (`true`). When `true`, vLLM starts with `--language-model-only` (skips the multimodal stack). Compose sets `false` to keep the full server path; set `true` in `.env` if you want the lighter LLM-only startup |
+| `LANGUAGE_MODEL_ONLY` | `true` | Entrypoint default: when unset (or not `false`), vLLM starts with `--language-model-only` (skips the multimodal stack — this model is text-only, so this is the lighter startup). To keep the full server path, set `LANGUAGE_MODEL_ONLY=false` in `docker-compose.yml` |
 | `REASONING_PARSER` | `qwen3` | Parser that splits reasoning content from the response |
 | `DEFAULT_ENABLE_THINKING` | `true` | Server-side default for `enable_thinking` (per-request `chat_template_kwargs` overrides it) |
+| `DEFAULT_PRESERVE_THINKING` | `true` | Keep historical assistant thinking in multi-turn context; `false` strips it to save context (inert unless the client echoes reasoning back) |
 | `TOOL_CALL_PARSER` | `qwen3_coder` | Tool-call response parser |
 | `ENABLE_AUTO_TOOL_CHOICE` | `true` | Allow `tool_choice: "auto"` |
 
@@ -198,7 +204,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
-| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set in `.env` to use a fixed key; if empty, the entrypoint generates and persists `sk-<uuid>` |
+| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored — the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
 | `DISABLE_LOG_STATS` | `false` | Disable periodic vLLM throughput statistics; requires `ENABLE_REQUEST_METRICS=false` |
 | `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Detailed prompt-token breakdown in usage |
@@ -209,7 +215,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `SAFETENSORS_LOAD_STRATEGY` | `prefetch` | Weight loading strategy |
-| `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `0` | Disable CUDA-graph memory profiling |
+| `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `1` | Estimate CUDA-graph memory in the profiler (on) |
 | `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/tmp/flashinfer_autotune_cache` | FlashInfer autotune cache location |
 | `NVIDIA_VISIBLE_DEVICES` | `all` | GPU passthrough |
 | `NVIDIA_DRIVER_CAPABILITIES` | `compute,utility` | GPU driver capabilities |
@@ -224,9 +230,9 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 ## Notes
 
 - **Variants:** `unsloth/Qwen3.8-27B-NVFP4` (Compressed-Tensors, default) and `nvidia/Qwen3.6-27B-NVFP4` (ModelOpt). To switch, edit the `MODEL_NAME` / `QUANTIZATION` / `HF_CACHE_VOLUME` / `MAX_MODEL_LEN` block in `.env` and run `docker compose up -d`. Each variant has its own HF cache volume, so the first run after a switch downloads that variant's weights.
-- **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (compose passes it through; the entrypoint uses it instead of generating one). To disable, set `ENABLE_API_KEY=false`.
+- **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-qwen-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
 - **MTP (Multi-Token Prediction):** the NVFP4 checkpoints include up to 3 MTP layers. Default is 2 speculative tokens for better compute/accuracy balance (per-position acceptance rate ~60-70% at position 1-2 vs ~30-50% at position 3). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
-- **VRAM:** with `GPU_MEMORY_UTILIZATION=0.92` on 32 GB, consumption is ~29.4 GB.
+- **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.1 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on host port `1235` (mapped from internal port 8000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
 - **Reverse Proxy:** two modes via overlay:
@@ -240,7 +246,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 ## Useful Commands
 
 ```bash
-# Start (direct mode — localhost:1235 only)
+# Start (direct mode — HTTP on port 1235, bound to 0.0.0.0)
 docker compose up -d
 
 # Start with HTTPS proxy (remote access via DuckDNS)
