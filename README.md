@@ -12,8 +12,9 @@ by Renato Perini (mjordan79)
 |-------|----------|-----------|-----------|---------|-------------|
 | Qwen 3.8 — 27B NVFP4 | Alibaba | Unsloth | [`vllm-qwen-3.8-27b-nvfp4/`](vllm-qwen-3.8-27b-nvfp4/) | [unsloth/Qwen3.8-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) | `unsloth/Qwen3.8-27B-NVFP4` on vLLM (Compressed-Tensors) |
 | Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-qwen-3.8-27b-nvfp4/`](vllm-qwen-3.8-27b-nvfp4/) | [nvidia/Qwen3.6-27B-NVFP4](https://huggingface.co/nvidia/Qwen3.6-27B-NVFP4) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM (ModelOpt) |
+| Muse Glimmer 30B — NVFP4 | Meta | RedHatAI | [`vllm-muse-glimmer-30b-nvfp4/`](vllm-muse-glimmer-30b-nvfp4/) | [RedHatAI/Muse-Glimmer-30B-NVFP4](https://huggingface.co/RedHatAI/Muse-Glimmer-30B-NVFP4) | `RedHatAI/Muse-Glimmer-30B-NVFP4` on vLLM (Compressed-Tensors) |
 
-Both variants are served by the **same deployment** — the active checkpoint is selected in `.env` (`MODEL_NAME`, `QUANTIZATION`), not in the directory name.
+The two Qwen variants are served by the **same deployment** — the active checkpoint is selected in `.env` (`MODEL_NAME`, `QUANTIZATION`), not in the directory name.
 
 ## Directory Convention
 

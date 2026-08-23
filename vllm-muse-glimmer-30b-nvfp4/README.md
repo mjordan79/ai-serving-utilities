@@ -63,6 +63,8 @@ LETSENCRYPT_DOMAIN=your-domain.duckdns.org
 LETSENCRYPT_EMAIL=you@example.com
 ```
 
+To pin a fixed API key (optional) instead of the auto-generated one, add `VLLM_API_KEY=sk-...` to `.env` (documented in `.env.example`). Keep the value in the gitignored `.env`, never in compose.
+
 > `.env` is listed in `.gitignore` — never commit it.
 
 ### 2. Build and start
@@ -96,7 +98,7 @@ This starts additional containers:
 On the first run, certificate issuance takes ~2 minutes. Check progress:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme-companion
 ```
 
 Once the certificate is ready, access the API at `https://<your-domain.duckdns.org>`.
@@ -119,7 +121,7 @@ Save this value — it will **not** be shown again on subsequent restarts. You c
 docker exec vllm-museglimmer-server cat /root/.vllm-key/.api_key
 ```
 
-To disable authentication, set `ENABLE_API_KEY=false`.
+To disable authentication, edit `docker-compose.yml` and change the pass-through entry `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` (`.env` only holds the variables in `.env.example`; tuning is done in the compose file).
 
 ### 4. Verify
 
@@ -213,7 +215,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
-| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set in `.env` to use a fixed key; if empty, the entrypoint generates and persists `sk-<uuid>` |
+| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored — the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
 | `DISABLE_LOG_STATS` | `false` | Disable periodic vLLM throughput statistics; requires `ENABLE_REQUEST_METRICS=false` |
 | `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Detailed prompt-token breakdown in usage |
@@ -224,6 +226,8 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `SAFETENSORS_LOAD_STRATEGY` | `prefetch` | Weight loading strategy |
+| `VLLM_USE_V2_MODEL_RUNNER` | `0` | **Hardcoded in `docker-compose.yml`** (not a pass-through): the V2 model runner UVA buffer check fails on WSL2, so the V1 runner is forced |
+| `EXTRA_ARGS_STR` | `--mm-processor-cache-gb 0` | **Hardcoded in `docker-compose.yml`**: raw flags appended verbatim to `vllm serve`; disables the mm-processor cache (workaround for the "video placeholders" bug on the dev build) |
 | `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `1` | Estimate CUDA-graph memory in the profiler (on) |
 | `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/tmp/flashinfer_autotune_cache` | FlashInfer autotune cache location |
 | `NVIDIA_VISIBLE_DEVICES` | `all` | GPU passthrough |
@@ -243,7 +247,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
   docker compose build --build-arg VLLM_BASE=vllm/vllm-openai:v0.27.1
   ```
 - **`--generation-config auto`:** if the image rejects the flag on startup, remove the `GENERATION_CONFIG` block from `entrypoint.sh` and rebuild — sampling then comes from the request payloads. Do **not** run the model greedy either way.
-- **Coexistence with the Qwen deployment:** the two stacks run side by side — separate compose project names, containers (`muse-server` vs `vllm-server`), host ports (`1236` vs `1235`), HF cache and API-key volumes. The only shared resource is the GPU; the recipe's 1x numbers assume the Qwen stack is **not** running concurrently. The proxy overlay additionally needs 80/443 to itself.
+- **Coexistence with the Qwen deployment:** the two stacks run side by side — separate compose project names, containers (`vllm-museglimmer-server` vs `vllm-qwen-server`), host ports (`1236` vs `1235`), HF cache and API-key volumes.
 - **Speculative decoding (DFlash):** off by default — the 5.1 GB draft head (`meta-models/Muse-Glimmer-30B-assistant`, 15 tokens/step) OOMs on a single RTX 5090 (~400 MiB headroom). On a 2x setup with `TP_SIZE=2` the recipe measured ~240 tok/s decode (~3.5x). Enable via `ENABLE_SPEC_DECODING=true` only in that configuration.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.92` on 32 GB, consumption is ~28.8 GB (recipe, model + full 128K KV pool at ~179,647 tokens).
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
@@ -259,7 +263,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 ## Useful Commands
 
 ```bash
-# Start (direct mode — localhost:1236 only)
+# Start (direct mode — HTTP on port 1236, bound to 0.0.0.0)
 docker compose up -d
 
 # Start with HTTPS proxy (remote access via DuckDNS)
@@ -268,8 +272,8 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
 # Real-time logs
 docker compose logs -f
 
-# Proxy logs (acme certificate status)
-docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme
+# Proxy logs (acme-companion certificate status)
+docker compose -f docker-compose.yml -f docker-compose.proxy.yml logs -f acme-companion
 
 # Stop (direct mode)
 docker compose down
