@@ -6,16 +6,32 @@
 # - Different output lengths (decode sizes)
 # - Different data paths (reasoning, tool calls, standard chat)
 #
-# Usage: ./warmup.sh (auto-detects config from project .env)
+# Usage (invoke via bash — the scripts are stored in git without the exec bit):
+#   bash warmup.sh              Warmup default model (qwen)
+#   bash warmup.sh <model>      Warmup a specific model (qwen|muse)
+#
+# Auto-detects config from the selected model's .env and docker-compose.yml.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="${SCRIPT_DIR}/.."
 
 source "${SCRIPT_DIR}/lib.sh"
 
-# ── Auto-detect configuration from project .env (shared with run.sh — lib.sh) ─
+# ── Parse arguments: [model] ────────────────────────────────────────────────
+
+MODEL_SELECTOR="${1:-qwen}"
+case "$MODEL_SELECTOR" in
+    qwen|muse) ;;
+    *)
+        echo "ERROR: Unknown model '${MODEL_SELECTOR}'. Valid models: qwen, muse."
+        exit 1
+        ;;
+esac
+
+# ── Resolve model target, then auto-detect configuration from its .env ─────
+
+resolve_model_target "$MODEL_SELECTOR"
 
 ENV_FILE="${PROJECT_DIR}/.env"
 parse_project_env "$ENV_FILE"
@@ -62,6 +78,7 @@ post() {
 
 log "═══════════════════════════════════════════════════════════"
 log "  WARMUP — Triton kernel pre-compilation"
+log "  Deployment: ${MODEL_SELECTOR}"
 log "  Target: ${BASE_URL}"
 log "═══════════════════════════════════════════════════════════"
 

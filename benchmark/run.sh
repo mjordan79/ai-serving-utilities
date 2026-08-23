@@ -2,25 +2,58 @@
 # run.sh — Master benchmark runner.
 #
 # Usage (invoke via bash — the scripts are stored in git without the exec bit):
-#   bash run.sh                  Run all benchmarks
-#   bash run.sh <test>           Run a single test (e.g., 01_simple_chat)
+#   bash run.sh                       Run all benchmarks, default model (qwen)
+#   bash run.sh <model>               Run all benchmarks for a model (qwen|muse)
+#   bash run.sh <model> <test>        Run a single test for a model
+#   bash run.sh <test>                Backward-compatible single test, default model
 #
-# Reads configuration from the project's .env file (parent directory).
-# Recovers API_KEY automatically via docker compose.
+# The target model is selected positionally (default: qwen). Configuration is
+# auto-detected from the selected model's .env and docker-compose.yml.
+# Recovers API_KEY automatically via docker.
 # Results are written to results/<model_label>/
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="${SCRIPT_DIR}/.."
 TESTS_DIR="${SCRIPT_DIR}/tests"
 RESULTS_DIR="${SCRIPT_DIR}/results"
 
 # Source shared library for report helpers
 source "${SCRIPT_DIR}/lib.sh"
 
-# ── Auto-detect configuration from project .env ─────────────────────────────
+# ── Parse arguments: [model] [test] ─────────────────────────────────────────
+# $1 = model selector (qwen|muse, default qwen). Backward compatibility: if $1
+# names a test file and $2 is absent, it is treated as the test name with the
+# default model (e.g., `bash run.sh 01_simple_chat`).
+MODEL_SELECTOR="qwen"
+SINGLE_TEST=""
+if [[ -n "${1:-}" ]]; then
+    case "$1" in
+        qwen|muse)
+            MODEL_SELECTOR="$1"
+            SINGLE_TEST="${2:-}"
+            ;;
+        *)
+            if [[ -z "${2:-}" && -f "${TESTS_DIR}/$1.sh" ]]; then
+                SINGLE_TEST="$1"
+            else
+                echo "ERROR: Unknown model or test: '${1}'"
+                echo ""
+                echo "Usage: bash run.sh [model] [test]"
+                echo "  model : qwen | muse (default: qwen)"
+                echo "  test  : optional single test, e.g. 01_simple_chat"
+                echo ""
+                echo "Available tests:"
+                ls -1 "${TESTS_DIR}/"[0-9]*.sh 2>/dev/null | xargs -I{} basename {} .sh
+                exit 1
+            fi
+            ;;
+    esac
+fi
 
+# ── Resolve model target, then auto-detect configuration from its .env ─────
+
+resolve_model_target "$MODEL_SELECTOR"
 ENV_FILE="${PROJECT_DIR}/.env"
 
 # Parse .env, resolve BASE_URL and recover the API key (shared with warmup.sh — lib.sh)
@@ -43,9 +76,7 @@ ENABLE_THINKING="${ENABLE_THINKING:-true}"
 CURL_TIMEOUT="${CURL_TIMEOUT:-600}"
 export ITERATIONS ENABLE_THINKING CURL_TIMEOUT
 
-# ── Parse arguments ─────────────────────────────────────────────────────────
-
-SINGLE_TEST="${1:-}"
+# ── Validate single-test path ───────────────────────────────────────────────
 
 if [[ -n "$SINGLE_TEST" ]]; then
     test_path="${TESTS_DIR}/${SINGLE_TEST}.sh"
@@ -89,10 +120,11 @@ print_box() {
 
 echo ""
 print_box "BENCHMARK SUITE" \
-    "Target : ${BASE_URL}" \
-    "Model  : ${MODEL_LABEL:-unknown}" \
-    "Iters  : ${ITERATIONS}" \
-    "Output : ${MODEL_SAFE}"
+    "Deployment : ${MODEL_SELECTOR}" \
+    "Target     : ${BASE_URL}" \
+    "Model      : ${MODEL_LABEL:-unknown}" \
+    "Iters      : ${ITERATIONS}" \
+    "Output     : ${MODEL_SAFE}"
 echo ""
 
 # Write TSV header

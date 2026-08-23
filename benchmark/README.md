@@ -4,11 +4,13 @@ by Renato Perini (mjordan79)
 
 Curl-based benchmark suite for vLLM deployments. No Python, no external dependencies beyond `bash`, `curl`, `gawk`, `date`.
 
+The suite is **model-agnostic**: it lives at the workspace root (outside any model directory) and targets any supported deployment — selected positionally at invocation time (default `qwen`).
+
 ## Structure
 
 ```
 benchmark/
-├── run.sh              # Master runner — auto-detects config from project .env
+├── run.sh              # Master runner — auto-detects config from the selected model's .env
 ├── compare.sh          # Side-by-side comparison of two runs
 ├── warmup.sh           # Triton kernel pre-compilation warmup
 ├── lib.sh              # Shared library (curl wrapper, metrics, reporting)
@@ -31,16 +33,27 @@ benchmark/
 
 ## Configuration
 
-All configuration is auto-detected from the project's `.env` file (`../.env`):
+All configuration is auto-detected from the **selected model's** `.env` and `docker-compose.yml`.
+
+### Target selection
+
+The model is selected as the first positional argument (default `qwen`):
+
+| Selector | Deployment directory | Container | Host port |
+|----------|----------------------|-----------|-----------|
+| `qwen` (default) | `vllm-qwen-3.8-27b-nvfp4/` | `vllm-qwen-server` | 1235 |
+| `muse` | `vllm-muse-glimmer-30b-nvfp4/` | `vllm-museglimmer-server` | 1236 |
+
+The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
 
 | .env Variable | Auto-Derived | Used For |
 |---------------|--------------|----------|
-| `LETSENCRYPT_DOMAIN` | → `BASE_URL` | `https://<domain>` if the domain resolves, else `http://localhost:1235` |
-| *(docker → .env)* | → `API_KEY` | Recovered live from the running container via `docker exec` / `docker compose exec`; if docker is unreachable (e.g. WSL without interop), falls back to `VLLM_API_KEY` from `.env`, then an interactive prompt |
+| `LETSENCRYPT_DOMAIN` | → `BASE_URL` | `https://<domain>` if the domain resolves, else `http://localhost:<port>` (port from the model's compose) |
+| *(docker → .env)* | → `API_KEY` | Recovered live from the running container via `docker exec <container>` / `docker compose exec`; if docker is unreachable (e.g. WSL without interop), falls back to `VLLM_API_KEY` from the model's `.env`, then an interactive prompt |
 | `MODEL_NAME` | → `MODEL_LABEL` | Result directory naming |
-| `QUANTIZATION` | → `MODEL_LABEL` | Appended to model label (e.g., `nvidia/Qwen3.6-27B-NVFP4 (modelopt)`) |
+| `QUANTIZATION` | → `MODEL_LABEL` | Appended to model label (e.g., `unsloth/Qwen3.8-27B-NVFP4 (compressed-tensors)`) |
 
-No manual config files needed. The scripts read the project state directly.
+No manual config files needed. The scripts read the model deployment state directly.
 
 ## Prerequisites
 
@@ -59,25 +72,32 @@ No `jq` required — all JSON parsing is handled via `gawk`/`sed`.
 
 ```bash
 cd benchmark
-bash warmup.sh
+bash warmup.sh            # default model (qwen)
+bash warmup.sh muse       # target Muse Glimmer
 ```
 
-Auto-detects the project `.env`, recovers the API key via Docker, and sends diverse prompts to pre-compile Triton kernels. **Skip this and your first iteration will be artificially slow.**
+Auto-detects the selected model's `.env`, recovers the API key via Docker, and sends diverse prompts to pre-compile Triton kernels. **Skip this and your first iteration will be artificially slow.**
 
 ### 2. Run benchmarks
 
 ```bash
-# All tests
+# All tests, default model (qwen)
 bash run.sh
 
-# Single test
+# All tests, Muse Glimmer
+bash run.sh muse
+
+# Single test for a model
+bash run.sh muse 03_code_generation
+
+# Backward-compatible: test name only, default model
 bash run.sh 01_simple_chat
 ```
 
 ### 3. Compare results
 
 ```bash
-bash compare.sh 'results/unsloth_Qwen3-8-27B-NVFP4-(compressed-tensors)' 'results/nvidia_Qwen3-6-27B-NVFP4-(modelopt)'
+bash compare.sh 'results/unsloth_Qwen3-8-27B-NVFP4-(compressed-tensors)' 'results/RedHatAI-Muse-Glimmer-30B-NVFP4-(compressed-tensors)'
 ```
 
 Directory names are produced by `run.sh` from `MODEL_NAME + " (${QUANTIZATION})"` sanitized via `tr` (`/` → `_`, `.` → `-`, space → `-`). The markdown report is written to `results/comparison/`.
@@ -119,7 +139,7 @@ simple_chat    3    15    51    241    1820    28.02
 ## Notes
 
 - `MAX_NUM_SEQS=1` in the deployment means only one concurrent request. These benchmarks are sequential by design.
-- Run both NVIDIA and Unsloth on the **same hardware, same load** for a fair comparison.
+- Run both deployments (qwen vs muse) on the **same hardware, same load** for a fair comparison.
 - GPU temperature affects performance. Let the system stabilize between runs.
 - The warmup script is not optional — Triton kernel compilation on first use adds significant latency.
 

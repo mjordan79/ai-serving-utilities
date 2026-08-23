@@ -7,7 +7,44 @@
 set -euo pipefail
 
 # ── Shared configuration discovery (used by run.sh and warmup.sh) ──────────
-# Callers must define PROJECT_DIR before invoking these functions.
+# Callers invoke resolve_model_target <model> first; it defines PROJECT_DIR
+# (plus DIRECT_PORT / CONTAINER_NAME) for the selected model deployment.
+
+# Model selector → deployment directory (relative to the workspace root, the
+# parent of this suite). Single point of maintenance: renaming a model
+# directory only requires updating this table.
+MODEL_QWEN_DIR="vllm-qwen-3.8-27b-nvfp4"
+MODEL_MUSE_DIR="vllm-muse-glimmer-30b-nvfp4"
+
+# Resolve the target model deployment.
+#   $1 = model selector (qwen|muse), default qwen.
+# Exports:
+#   PROJECT_DIR    — absolute path to the model deployment directory
+#   DIRECT_PORT    — host port published by the model's docker-compose.yml
+#   CONTAINER_NAME — container_name from the model's docker-compose.yml
+resolve_model_target() {
+    local selector="${1:-qwen}"
+    local model_dir
+    case "$selector" in
+        qwen) model_dir="$MODEL_QWEN_DIR" ;;
+        muse) model_dir="$MODEL_MUSE_DIR" ;;
+        *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse." >&2; return 1 ;;
+    esac
+    local suite_dir
+    suite_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    PROJECT_DIR="$(cd "${suite_dir}/.." && pwd)/${model_dir}"
+    [[ -d "$PROJECT_DIR" ]] || { echo "ERROR: Model directory not found: ${PROJECT_DIR}" >&2; return 1; }
+    local compose="${PROJECT_DIR}/docker-compose.yml"
+    [[ -f "$compose" ]] || { echo "ERROR: Compose file not found: ${compose}" >&2; return 1; }
+    # First published port mapping "<host>:8000" (vLLM listens on 8000 inside).
+    DIRECT_PORT=$(grep -oE '"[0-9]+:8000"' "$compose" | head -1 | tr -d '"' | cut -d: -f1 || true)
+    [[ -n "$DIRECT_PORT" ]] || { echo "ERROR: No published port <host>:8000 found in ${compose}" >&2; return 1; }
+    CONTAINER_NAME=$(grep -E '^[[:space:]]*container_name:' "$compose" | head -1 \
+        | sed 's/.*container_name:[[:space:]]*//' | tr -d '"\r' || true)
+    [[ -n "$CONTAINER_NAME" ]] || { echo "ERROR: No container_name found in ${compose}" >&2; return 1; }
+    export PROJECT_DIR DIRECT_PORT CONTAINER_NAME
+    echo "INFO: Target model '${selector}' → ${PROJECT_DIR} (port ${DIRECT_PORT}, container ${CONTAINER_NAME})" >&2
+}
 
 # Trim leading/trailing whitespace (pure bash — no xargs, no subshell).
 trim() {
@@ -35,17 +72,17 @@ parse_project_env() {
 }
 
 # Resolve BASE_URL: external domain if reachable, otherwise the direct
-# HTTP endpoint published by docker-compose.yml (127.0.0.1:1235).
+# HTTP endpoint published by docker-compose.yml (localhost:${DIRECT_PORT}).
 resolve_base_url() {
     if [[ -n "${LETSENCRYPT_DOMAIN:-}" ]]; then
         if curl -sS -k --max-time 5 --output /dev/null "https://${LETSENCRYPT_DOMAIN}/health" 2>/dev/null; then
             BASE_URL="https://${LETSENCRYPT_DOMAIN}"
         else
-            echo "INFO: ${LETSENCRYPT_DOMAIN} not reachable, falling back to http://localhost:1235"
-            BASE_URL="http://localhost:1235"
+            echo "INFO: ${LETSENCRYPT_DOMAIN} not reachable, falling back to http://localhost:${DIRECT_PORT}"
+            BASE_URL="http://localhost:${DIRECT_PORT}"
         fi
     else
-        BASE_URL="http://localhost:1235"
+        BASE_URL="http://localhost:${DIRECT_PORT}"
     fi
     export BASE_URL
 }
@@ -53,16 +90,19 @@ resolve_base_url() {
 # Recover the vLLM API key. Resolution order:
 #   1. Live from the running container (docker exec → docker compose exec).
 #   2. VLLM_API_KEY from the project .env (fixed-key convention).
-#   3. Interactive prompt as last resort.
+#   3. No-auth probe: if the server answers /v1/models without credentials,
+#      authentication is disabled and an empty key is a valid state.
+#   4. Interactive prompt as last resort.
 # NOTE: docker output is captured via a temp file, not command substitution —
 # under WSL interop (docker.exe), substitution/pipe capture can come back empty
 # while file redirect works reliably.
 recover_api_key() {
     API_KEY=""
+    local probe_code=""
     if command -v docker >/dev/null 2>&1; then
         local keyfile
         keyfile=$(mktemp 2>/dev/null || printf '/tmp/vllm_key_%s' "$$")
-        docker exec vllm-qwen-server cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+        docker exec "${CONTAINER_NAME}" cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
             && API_KEY=$(<"$keyfile")
         if [[ -z "$API_KEY" ]]; then
             # Fallback: docker compose (service name via compose file)
@@ -77,13 +117,25 @@ recover_api_key() {
         echo "INFO: Using VLLM_API_KEY from .env (docker recovery unavailable)." >&2
     fi
     if [[ -z "$API_KEY" ]]; then
-        echo "WARNING: Could not auto-detect API_KEY." >&2
-        echo "         Docker may not be running or the container is not available." >&2
-        echo "         Set VLLM_API_KEY in the project .env to skip this prompt." >&2
-        echo -n "         Enter VLLM_API_KEY: " >&2
-        read -r API_KEY || API_KEY=""
+        # No-auth probe: a server running with ENABLE_API_KEY=false ignores the
+        # Authorization header and answers /v1/models without credentials (200).
+        # An authenticated server answers 401. Only treat 200 as "auth off".
+        probe_code=$(curl -sS -k --max-time 5 -o /dev/null -w '%{http_code}' \
+            "${BASE_URL%/}/v1/models" 2>/dev/null || echo 000)
+        if [[ "$probe_code" == "200" ]]; then
+            echo "INFO: API key disabled on server (no-auth probe OK) — continuing without a key." >&2
+        else
+            echo "WARNING: Could not auto-detect API_KEY." >&2
+            echo "         Docker may not be running or the container is not available." >&2
+            echo "         Set VLLM_API_KEY in the project .env to skip this prompt." >&2
+            echo -n "         Enter VLLM_API_KEY: " >&2
+            read -r API_KEY || API_KEY=""
+        fi
     fi
-    [[ -n "$API_KEY" ]] || { echo "ERROR: API_KEY is required." >&2; return 1; }
+    if [[ -z "$API_KEY" && "$probe_code" != "200" ]]; then
+        echo "ERROR: API_KEY is required." >&2
+        return 1
+    fi
     export API_KEY
 }
 

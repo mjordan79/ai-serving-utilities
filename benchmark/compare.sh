@@ -19,7 +19,7 @@ if [[ $# -lt 2 ]]; then
     echo ""
     echo "Example (dir names are produced by run.sh — MODEL_NAME + ' (<quantization>)'"
     echo "sanitized via tr: / → _, . → -, space → -):"
-    echo "  $0 'results/unsloth_Qwen3-8-27B-NVFP4-(compressed-tensors)' 'results/nvidia_Qwen3-6-27B-NVFP4-(modelopt)'"
+    echo "  $0 'results/unsloth_Qwen3-8-27B-NVFP4-(compressed-tensors)' 'results/RedHatAI-Muse-Glimmer-30B-NVFP4-(compressed-tensors)'"
     exit 1
 fi
 
