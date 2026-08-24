@@ -484,10 +484,65 @@ main {
   bottom: 3.5vh;
   right: auto;
   left: 3vw;
-  width: min(40rem, 42vw);  /* same width contract as .shell */  height: auto; /* override .code-panel's min(80vh,700px): height must be DERIVED
-                   from top+bottom (fixed positioning with both set). Without this
-                   the inherited height wins and the bottom anchor is ignored
-                   (panel overflows .net's bottom edge by ~45px at vh≈1086). */}
+  width: min(40rem, 42vw); /* same width contract as .shell */
+  /* Override .code-panel's min(80vh,700px): height must be DERIVED from
+     top+bottom (fixed positioning with both set). Without this the
+     inherited height wins and the bottom anchor is ignored (panel
+     overflows .net's bottom edge by ~45px at vh≈1086). */
+  height: auto;
+}
+
+/* ---------- background yaml code panel (bottom center) ---------- */
+/* Manifests (Deployment / Service / Ingress) of the line-gateway deployment
+   shown in the kubectl panel on the left. Same scroll machinery as
+   .code-panel (content written twice → translateY(-50%) seamless loop).
+   Stretched horizontally between .bash-panel and .net, mirroring their
+   geometry: left = left column (3vw) + their width (min(40rem,42vw)) + 13px
+   gap (same gap as shell→bash / java→net); right = .net (4vw) + .net width
+   (min(26rem,44vw)) + 13px. bottom: 3.5vh → bottom edge aligned with both.
+   Width is DERIVED from left+right, so width must stay auto. Height is
+   NOT .net's 270px: at 270px the top edge overlaps main's last lines
+   (bottom-anchored growth goes up, straight into the text). Capped at
+   246px — the visual reference is the last VISIBLE line of main
+   (~58px above main's border-box bottom: 32px padding + line
+   spacing), not the box. At 246px the perceived gap text→panel is
+   ~14px, the same rhythm as java↔net and the 13px side gaps. The
+   panel's box still overlaps main's empty bottom padding by ~44px:
+   sanctioned (main z-5, text-shadow). On shorter viewports main sits
+   lower and the panels may meet; same policy covers it. */
+.yaml-panel {
+  top: auto;
+  left: calc(3vw + min(40rem, 42vw) + 13px);
+  right: calc(4vw + min(26rem, 44vw) + 13px);
+  bottom: 3.5vh;
+  width: auto;
+  height: min(22.7vh, 246px);
+}
+
+/* ---------- background helm shell panel (top center) ---------- */
+/* Second instance of the .shell machinery: shell.js drives #helm-tty
+   with a simulated helm session (repo update / template / upgrade -i
+   ending in the "Happy Helming!" output) for the same line-gateway
+   release. Sits in the top-center band between .shell (left) and
+   .code-panel (right), same 13px gap rhythm as the other panels.
+   Width is DERIVED from left+right (must stay auto).
+   Vertical space is the scarcest on the page: below the 6vh top line,
+   main's first rendered text line starts at ~272px (2126×1086). The
+   body is capped at 10rem: 6vh (65px) + title (~32px) + 10rem (160px)
+   + 2px border ≈ 194px → bottom ≈ 259px, leaving a ~13px gap to the
+   text, the same rhythm as the 13/14px gaps elsewhere. 10rem fits
+   7 lines of 11px × 1.7 (18.7px/line) inside 0.5/0.6rem padding —
+   shell.js trims #helm-tty to 7 lines. Keep both in sync.
+   Below ~1550px the band is too narrow for the derived width. */
+.helm-shell {
+  left: calc(3vw + min(40rem, 42vw) + 13px);
+  right: calc(4vw + min(36rem, 44vw) + 13px);
+  width: auto;
+}
+
+.helm-shell .shell-body {
+  height: 10rem;
+}
 
 /* ---------- background neural-net graph panel ---------- */
 /* Procedurally generated SVG feedforward net (see graph.js):
@@ -587,6 +642,12 @@ main {
 
 @media (max-width: 860px) {
   .code-panel, .shell, .net { display: none; }
+}
+
+/* the top-center band between .shell and .code-panel is too narrow
+   below this width; .helm-shell's derived width would collapse */
+@media (max-width: 1550px) {
+  .helm-shell { display: none; }
 }
 
 /* Short viewports: the panel would cover the centered text */

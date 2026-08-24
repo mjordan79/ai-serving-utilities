@@ -50,6 +50,16 @@
       <div class="shell-body" id="shell-tty"></div>
     </div>
 
+    <!-- Background shell panel: simulated interactive helm session,
+       same engine as the kubectl panel (shell.js drives #helm-tty).
+       Top-center, in the band between .shell and .code-panel. The
+       #helm-tty box is SHORTER (10rem / 7 lines, see style.css): the
+       main text starts just below this band. -->
+    <div class="shell helm-shell" aria-hidden="true">
+      <div class="panel-title">root@digitalnucleus:~/ops$ helm -n telco upgrade -i line-gateway</div>
+      <div class="shell-body" id="helm-tty"></div>
+    </div>
+
     <!-- Background bash code panel: same scrolling technique as .code-panel
        (content written twice → translateY(-50%) seamless loop), but pinned
        to the LEFT column below the kubectl shell. A diagnostic shell script
@@ -137,6 +147,221 @@ OUT=$(<span class="c-ann">curl</span> -fsSk -X POST <span class="c-str">"https:/
 <span class="c-kw">fi</span>
 
 <span class="c-ann">echo</span> <span class="c-str">"OK: line reachable"</span>
+</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Background yaml code panel: Helm chart source (values.yaml +
+       Go-templated deployment/service/ingress) for the line-gateway
+       release shown in the kubectl panel on the left. Sits bottom-center,
+       stretched horizontally between .bash-panel and .net. Same
+       twice-duplicated-content scroll trick as .code-panel. -->
+    <div class="code-panel yaml-panel" aria-hidden="true">
+      <div class="panel-title">root@digitalnucleus:~/ops$ cd line-gateway-chart && cat values.yaml templates/*.yaml</div>
+      <div class="code-clip">
+        <div class="code-scroll">
+          <code><span class="c-com"># values.yaml · chart line-gateway v1.4.2 · prod-eu-1</span>
+<span class="c-com"># last upgrade: 2026-08-13 04:02 UTC · release status: DEGRADED (0/2 ready)</span>
+
+<span class="c-ann">replicaCount:</span> <span class="c-kw">2</span>
+
+<span class="c-ann">image:</span>
+  <span class="c-ann">repository:</span> ghcr.io/telco-gw/line-gateway
+  <span class="c-ann">tag:</span> <span class="c-str">"1.4.2"</span>
+  <span class="c-ann">pullPolicy:</span> IfNotPresent
+
+<span class="c-ann">service:</span>
+  <span class="c-ann">type:</span> ClusterIP
+  <span class="c-ann">port:</span> <span class="c-kw">8443</span>
+
+<span class="c-ann">env:</span>
+  <span class="c-ann">peer:</span>
+    <span class="c-ann">addr:</span> <span class="c-str">"10.4.9.4:9200"</span>
+
+<span class="c-ann">resources:</span>
+  <span class="c-ann">requests:</span>
+    <span class="c-ann">cpu:</span> 250m
+    <span class="c-ann">memory:</span> 512Mi
+  <span class="c-ann">limits:</span>
+    <span class="c-ann">memory:</span> 1Gi
+
+<span class="c-ann">ingress:</span>
+  <span class="c-ann">host:</span> gw.telco.internal
+  <span class="c-ann">tlsSecret:</span> gw-telco-tls
+
+<span class="c-com"># ---- templates/deployment.yaml ----</span>
+<span class="c-ann">apiVersion:</span> apps/v1
+<span class="c-ann">kind:</span> Deployment
+<span class="c-ann">metadata:</span>
+  <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+  <span class="c-ann">labels:</span>
+    <span class="c-kw">{{- include "line-gateway.labels" . | nindent 4 }}</span>
+<span class="c-ann">spec:</span>
+  <span class="c-ann">replicas:</span> <span class="c-kw">{{ .Values.replicaCount }}</span>
+  <span class="c-ann">selector:</span>
+    <span class="c-ann">matchLabels:</span>
+      <span class="c-kw">{{- include "line-gateway.selectorLabels" . | nindent 6 }}</span>
+  <span class="c-ann">template:</span>
+    <span class="c-ann">metadata:</span>
+      <span class="c-ann">labels:</span>
+        <span class="c-kw">{{- include "line-gateway.selectorLabels" . | nindent 8 }}</span>
+    <span class="c-ann">spec:</span>
+      <span class="c-ann">containers:</span>
+        - <span class="c-ann">name:</span> <span class="c-kw">{{ .Chart.Name }}</span>
+          <span class="c-ann">image:</span> <span class="c-str">"{{ .Values.image.repository }}:{{ .Values.image.tag }}"</span>
+          <span class="c-ann">imagePullPolicy:</span> <span class="c-kw">{{ .Values.image.pullPolicy }}</span>
+          <span class="c-ann">ports:</span>
+            - <span class="c-ann">containerPort:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+          <span class="c-ann">env:</span>
+            - <span class="c-ann">name:</span> PEER_ADDR
+              <span class="c-ann">value:</span> <span class="c-str">"{{ .Values.env.peer.addr }}"</span>
+          <span class="c-ann">readinessProbe:</span>
+            <span class="c-ann">httpGet:</span>
+              <span class="c-ann">path:</span> /healthz
+              <span class="c-ann">port:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+            <span class="c-ann">initialDelaySeconds:</span> <span class="c-kw">5</span>
+            <span class="c-ann">periodSeconds:</span> <span class="c-kw">10</span>
+          <span class="c-ann">resources:</span>
+            <span class="c-kw">{{- toYaml .Values.resources | nindent 12 }}</span>
+
+<span class="c-com"># ---- templates/service.yaml ----</span>
+<span class="c-ann">apiVersion:</span> v1
+<span class="c-ann">kind:</span> Service
+<span class="c-ann">metadata:</span>
+  <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+<span class="c-ann">spec:</span>
+  <span class="c-ann">type:</span> <span class="c-kw">{{ .Values.service.type }}</span>
+  <span class="c-ann">selector:</span>
+    <span class="c-kw">{{- include "line-gateway.selectorLabels" . | nindent 4 }}</span>
+  <span class="c-ann">ports:</span>
+    - <span class="c-ann">port:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+      <span class="c-ann">targetPort:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+
+<span class="c-com"># ---- templates/ingress.yaml ----</span>
+<span class="c-ann">apiVersion:</span> networking.k8s.io/v1
+<span class="c-ann">kind:</span> Ingress
+<span class="c-ann">metadata:</span>
+  <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+  <span class="c-ann">annotations:</span>
+    <span class="c-ann">nginx.ingress.kubernetes.io/ssl-redirect:</span> <span class="c-str">"true"</span>
+<span class="c-ann">spec:</span>
+  <span class="c-ann">tls:</span>
+    - <span class="c-ann">hosts:</span>
+        - <span class="c-kw">{{ .Values.ingress.host | quote }}</span>
+      <span class="c-ann">secretName:</span> <span class="c-kw">{{ .Values.ingress.tlsSecret }}</span>
+  <span class="c-ann">rules:</span>
+    - <span class="c-ann">host:</span> <span class="c-kw">{{ .Values.ingress.host }}</span>
+      <span class="c-ann">http:</span>
+        <span class="c-ann">paths:</span>
+          - <span class="c-ann">path:</span> /
+            <span class="c-ann">pathType:</span> Prefix
+            <span class="c-ann">backend:</span>
+              <span class="c-ann">service:</span>
+                <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+                <span class="c-ann">port:</span>
+                  <span class="c-ann">number:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+</code>
+          <code><span class="c-com"># values.yaml · chart line-gateway v1.4.2 · prod-eu-1</span>
+<span class="c-com"># last upgrade: 2026-08-13 04:02 UTC · release status: DEGRADED (0/2 ready)</span>
+
+<span class="c-ann">replicaCount:</span> <span class="c-kw">2</span>
+
+<span class="c-ann">image:</span>
+  <span class="c-ann">repository:</span> ghcr.io/telco-gw/line-gateway
+  <span class="c-ann">tag:</span> <span class="c-str">"1.4.2"</span>
+  <span class="c-ann">pullPolicy:</span> IfNotPresent
+
+<span class="c-ann">service:</span>
+  <span class="c-ann">type:</span> ClusterIP
+  <span class="c-ann">port:</span> <span class="c-kw">8443</span>
+
+<span class="c-ann">env:</span>
+  <span class="c-ann">peer:</span>
+    <span class="c-ann">addr:</span> <span class="c-str">"10.4.9.4:9200"</span>
+
+<span class="c-ann">resources:</span>
+  <span class="c-ann">requests:</span>
+    <span class="c-ann">cpu:</span> 250m
+    <span class="c-ann">memory:</span> 512Mi
+  <span class="c-ann">limits:</span>
+    <span class="c-ann">memory:</span> 1Gi
+
+<span class="c-ann">ingress:</span>
+  <span class="c-ann">host:</span> gw.telco.internal
+  <span class="c-ann">tlsSecret:</span> gw-telco-tls
+
+<span class="c-com"># ---- templates/deployment.yaml ----</span>
+<span class="c-ann">apiVersion:</span> apps/v1
+<span class="c-ann">kind:</span> Deployment
+<span class="c-ann">metadata:</span>
+  <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+  <span class="c-ann">labels:</span>
+    <span class="c-kw">{{- include "line-gateway.labels" . | nindent 4 }}</span>
+<span class="c-ann">spec:</span>
+  <span class="c-ann">replicas:</span> <span class="c-kw">{{ .Values.replicaCount }}</span>
+  <span class="c-ann">selector:</span>
+    <span class="c-ann">matchLabels:</span>
+      <span class="c-kw">{{- include "line-gateway.selectorLabels" . | nindent 6 }}</span>
+  <span class="c-ann">template:</span>
+    <span class="c-ann">metadata:</span>
+      <span class="c-ann">labels:</span>
+        <span class="c-kw">{{- include "line-gateway.selectorLabels" . | nindent 8 }}</span>
+    <span class="c-ann">spec:</span>
+      <span class="c-ann">containers:</span>
+        - <span class="c-ann">name:</span> <span class="c-kw">{{ .Chart.Name }}</span>
+          <span class="c-ann">image:</span> <span class="c-str">"{{ .Values.image.repository }}:{{ .Values.image.tag }}"</span>
+          <span class="c-ann">imagePullPolicy:</span> <span class="c-kw">{{ .Values.image.pullPolicy }}</span>
+          <span class="c-ann">ports:</span>
+            - <span class="c-ann">containerPort:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+          <span class="c-ann">env:</span>
+            - <span class="c-ann">name:</span> PEER_ADDR
+              <span class="c-ann">value:</span> <span class="c-str">"{{ .Values.env.peer.addr }}"</span>
+          <span class="c-ann">readinessProbe:</span>
+            <span class="c-ann">httpGet:</span>
+              <span class="c-ann">path:</span> /healthz
+              <span class="c-ann">port:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+            <span class="c-ann">initialDelaySeconds:</span> <span class="c-kw">5</span>
+            <span class="c-ann">periodSeconds:</span> <span class="c-kw">10</span>
+          <span class="c-ann">resources:</span>
+            <span class="c-kw">{{- toYaml .Values.resources | nindent 12 }}</span>
+
+<span class="c-com"># ---- templates/service.yaml ----</span>
+<span class="c-ann">apiVersion:</span> v1
+<span class="c-ann">kind:</span> Service
+<span class="c-ann">metadata:</span>
+  <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+<span class="c-ann">spec:</span>
+  <span class="c-ann">type:</span> <span class="c-kw">{{ .Values.service.type }}</span>
+  <span class="c-ann">selector:</span>
+    <span class="c-kw">{{- include "line-gateway.selectorLabels" . | nindent 4 }}</span>
+  <span class="c-ann">ports:</span>
+    - <span class="c-ann">port:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+      <span class="c-ann">targetPort:</span> <span class="c-kw">{{ .Values.service.port }}</span>
+
+<span class="c-com"># ---- templates/ingress.yaml ----</span>
+<span class="c-ann">apiVersion:</span> networking.k8s.io/v1
+<span class="c-ann">kind:</span> Ingress
+<span class="c-ann">metadata:</span>
+  <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+  <span class="c-ann">annotations:</span>
+    <span class="c-ann">nginx.ingress.kubernetes.io/ssl-redirect:</span> <span class="c-str">"true"</span>
+<span class="c-ann">spec:</span>
+  <span class="c-ann">tls:</span>
+    - <span class="c-ann">hosts:</span>
+        - <span class="c-kw">{{ .Values.ingress.host | quote }}</span>
+      <span class="c-ann">secretName:</span> <span class="c-kw">{{ .Values.ingress.tlsSecret }}</span>
+  <span class="c-ann">rules:</span>
+    - <span class="c-ann">host:</span> <span class="c-kw">{{ .Values.ingress.host }}</span>
+      <span class="c-ann">http:</span>
+        <span class="c-ann">paths:</span>
+          - <span class="c-ann">path:</span> /
+            <span class="c-ann">pathType:</span> Prefix
+            <span class="c-ann">backend:</span>
+              <span class="c-ann">service:</span>
+                <span class="c-ann">name:</span> <span class="c-kw">{{ include "line-gateway.fullname" . }}</span>
+                <span class="c-ann">port:</span>
+                  <span class="c-ann">number:</span> <span class="c-kw">{{ .Values.service.port }}</span>
 </code>
         </div>
       </div>
@@ -253,7 +478,7 @@ OUT=$(<span class="c-ann">curl</span> -fsSk -X POST <span class="c-str">"https:/
        columns left→right and staggered dash-pulses travel the edges.
        aria-hidden: texture, not content. -->
     <div class="net" aria-hidden="true">
-      <div class="panel-title">net · 6-8-8-4 · forward pass</div>
+      <div class="panel-title">feedforward net · 6-8-8-4 · forward pass</div>
       <div class="net-body">
         <svg id="net-svg" viewBox="0 0 440 252" aria-hidden="true"></svg>
 
