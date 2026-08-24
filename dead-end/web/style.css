@@ -71,7 +71,7 @@ body {
    The 48-digit half is written TWICE inside the span, so animating
    translateY from 0 to -50% (of the span's own height) loops with no
    visible seam.
-   11 columns with different left/size/speed/opacity read as depth.
+   21 columns with different left/size/speed/opacity read as depth.
    transform-only animation → composited, GPU-friendly.
    Line-height is a uniform 26px so the cover height is predictable:
    96 chars × 26px = 2496px, half = 1248px ≥ any common viewport height,
@@ -118,6 +118,19 @@ body {
 .matrix span:nth-child(9)  { left: 74%; font-size: 12px; --dur: 11s;   --delay: -5s;   --op: 0.09; }
 .matrix span:nth-child(10) { left: 83%; font-size: 10px; --dur: 7.5s;  --delay: -2.5s; --op: 0.12; }
 .matrix span:nth-child(11) { left: 92%; font-size: 14px; --dur: 13.5s; --delay: -8s;   --op: 0.06; }
+/* Dense fill: the extra 10 columns sit between the originals (~4.5%
+   horizontal step) and staggered in size/speed/delay to keep the
+   depth read instead of looking like a uniform curtain. */
+.matrix span:nth-child(12) { left: 7%;   font-size: 12px; --dur: 11s;   --delay: -5.5s; --op: 0.07; }
+.matrix span:nth-child(13) { left: 15%;  font-size: 10px; --dur: 8s;    --delay: -3.5s; --op: 0.09; }
+.matrix span:nth-child(14) { left: 24.5%; font-size: 14px; --dur: 14s;  --delay: -11s;  --op: 0.06; }
+.matrix span:nth-child(15) { left: 33%;  font-size: 11px; --dur: 9.5s;  --delay: -2.8s; --op: 0.08; }
+.matrix span:nth-child(16) { left: 42%;  font-size: 13px; --dur: 12.5s; --delay: -7.5s; --op: 0.05; }
+.matrix span:nth-child(17) { left: 51%;  font-size: 10px; --dur: 7.5s;  --delay: -5.8s; --op: 0.11; }
+.matrix span:nth-child(18) { left: 60%;  font-size: 12px; --dur: 10.5s; --delay: -4.2s; --op: 0.07; }
+.matrix span:nth-child(19) { left: 69%;  font-size: 15px; --dur: 13s;   --delay: -9.5s; --op: 0.05; }
+.matrix span:nth-child(20) { left: 78%;  font-size: 11px; --dur: 9s;    --delay: -1.8s; --op: 0.10; }
+.matrix span:nth-child(21) { left: 87%;  font-size: 13px; --dur: 12s;   --delay: -6.5s; --op: 0.06; }
 
 /* ---------- content ---------- */
 
@@ -128,6 +141,8 @@ main {
   line-height: 1.8;
   padding: 2rem;
   max-width: 36rem;
+  /* keeps the foreground readable where it overlaps the code panel */
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85);
 }
 
 .line {
@@ -336,6 +351,249 @@ main {
   50% { opacity: 0; }
 }
 
+/* ---------- background code panel (Spring Boot controller) ---------- */
+/* Transparent terminal window, fixed to the right. The code scrolls
+   slowly upward; the <code> block is written TWICE so a translateY
+   0 -> -50% loop is seamless (same trick as .matrix).
+   transform-only animation, pointer-events: none, z-index between the
+   matrix (1) and main (5). Muted token colors on a dim base read as
+   background texture, not as a second focal point. */
+.code-panel {
+  position: fixed;
+  top: 6vh;
+  right: 4vw;
+  /* 36rem fits the panel-title line: 75 ch × ~7.2px @12px mono ≈ 540px
+     + 22.4px padding ≈ 563px. Keep in sync with the title text in
+     index.html if it changes. */
+  width: min(36rem, 44vw);
+  height: min(80vh, 700px);
+  z-index: 2;
+  border: 1px solid rgba(57, 255, 136, 0.14);
+  border-radius: 4px;
+  background: rgba(8, 11, 10, 0.55);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0.62;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.panel-title {
+  padding: 0.45rem 0.7rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  color: #39ff88;
+  opacity: 0.7;
+  border-bottom: 1px solid rgba(57, 255, 136, 0.14);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.code-clip {
+  height: calc(100% - 2rem);
+  overflow: hidden;
+}
+
+.code-scroll {
+  will-change: transform;
+  animation: code-scroll 55s linear infinite;
+}
+
+.code-scroll code {
+  display: block;
+  padding: 0.7rem 0.9rem;
+  color: #5f6f66;
+  /* the HTML source carries real 4-space indentation; 'pre'
+     preserves it (default 'normal' collapses it to one space) */
+  white-space: pre;
+}
+
+@keyframes code-scroll {
+  to { transform: translateY(-50%); }
+}
+
+/* Token colors: muted, on-palette (green / cyan / amber / gray). */
+.c-kw  { color: #6ee7a8; }
+.c-ann { color: #2fd6c3; }
+.c-str { color: #d6a35c; }
+.c-com { color: #454b52; font-style: italic; }
+
+/* ---------- background shell panel (kubectl session) ---------- */
+/* Simulated live terminal, fixed to the left, driven by shell.js.
+   The box has a FIXED height: shell.js appends typed commands and
+   output and trims the oldest lines (MAX_LINES = 14), so the panel
+   is a constant-size window into the session, never full-viewport.
+   Sizing contract: 11px font × 1.7 line-height = 18.7px/line;
+   14 lines + 0.5/0.6rem padding = ~279px ≈ 17.5rem. Keep both in
+   sync if you change font, line-height, or MAX_LINES.
+   Left column stacking (2026-08-24): the shell sits at the TOP of the
+   left column and .bash-panel hangs below it — its `top` is offset
+   from the shell's top by the shell's full height (title ~1.5rem +
+   body 17.5rem + 0.5rem gap). Keep in sync if shell sizing changes. */
+.shell {
+  position: fixed;
+  top: 6vh;
+  left: 3vw;
+  /* 40rem fits the longest rendered line: PS1 (25 ch) + longest
+     kubectl command (65 ch) = 90 ch ≈ 594px at 11px mono + padding.
+     The 42vw cap keeps the panel clear of .code-panel (right: 4vw,
+     width up to 44vw) on 1024–1300px viewports. */
+  width: min(40rem, 42vw);
+  z-index: 2;
+  border: 1px solid rgba(57, 255, 136, 0.14);
+  border-radius: 4px;
+  background: rgba(8, 11, 10, 0.55);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0.58;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.shell-body {
+  height: min(17.5rem, 46vh);
+  padding: 0.5rem 0.8rem 0.6rem;
+  white-space: pre;
+  overflow: hidden;
+}
+
+.s-line { color: #5f6f66; }
+.s-ps1  { color: #6ee7a8; }
+.s-out  { color: #5f6f66; }
+.s-out.dim { color: #454b52; }
+.s-warn { color: #d6a35c; }
+.s-err  { color: #ff5f56; }
+
+/* ---------- background bash code panel (left column, below .shell) ---------- */
+/* Reuses the .code-panel machinery (same scroll animation, token colors,
+   title bar). Position mirrors the RIGHT column's anchoring scheme:
+   .code-panel (Java) is pinned from the top, .net from the bottom
+   (bottom: 3.5vh) — the visible gap between the two is the leftover
+   space. Same trick here: bash-panel is pinned by BOTH top and bottom,
+   so it stretches to fill the column.
+   - bottom: 3.5vh → bottom edge aligned with .net's bottom edge
+   - top: 6vh (shell top) + 20rem (shell title ~1.5rem + body 17.5rem)
+     + 8px → the 8px overage over the shell's real height (~19.7rem
+     rendered) yields the ~13px gap, the same distance as between the
+     Java panel and the net panel on ~1080px-tall viewports.
+   If .shell sizing changes, re-measure its rendered height and adjust
+   the 20rem term (gap target ≈ 13px). */
+.bash-panel {
+  top: calc(6vh + 20rem + 8px);
+  bottom: 3.5vh;
+  right: auto;
+  left: 3vw;
+  width: min(40rem, 42vw);  /* same width contract as .shell */  height: auto; /* override .code-panel's min(80vh,700px): height must be DERIVED
+                   from top+bottom (fixed positioning with both set). Without this
+                   the inherited height wins and the bottom anchor is ignored
+                   (panel overflows .net's bottom edge by ~45px at vh≈1086). */}
+
+/* ---------- background neural-net graph panel ---------- */
+/* Procedurally generated SVG feedforward net (see graph.js):
+   input → dense·1 → dense·2 → output. Classic circle nodes on
+   straight edges. All effects are CSS, on a shared 4s cycle:
+   - a forward-pass wave lights the columns left→right — each
+     node's --d delay is its layer index (plus small jitter), so
+     the whole column glows at once (core stroke + soft halo)
+   - ~45% of edges carry a travelling dot: pathLength=1 normalizes
+     every edge to unit length, so one short dash (stroke-dasharray
+     0.05 0.95) slides start→end as dashoffset goes 0 → -1; per-edge
+     delays are staggered inside the source column's slot so the
+     pulses follow the wave
+   Same treatment as .shell / .code-panel: dim, pointer-events:
+   none, z-index 2 — background texture, not a focal point. */
+.net {
+  position: fixed;
+  right: 4vw;
+  bottom: 3.5vh;
+  width: min(26rem, 44vw);
+  z-index: 2;
+  border: 1px solid rgba(57, 255, 136, 0.14);
+  border-radius: 4px;
+  background: rgba(8, 11, 10, 0.55);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  opacity: 0.6;
+  font-size: 11px;
+}
+
+.net-body {
+  padding: 0.4rem 0.55rem 0.45rem;
+}
+
+.net svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Base edges: dense mesh, barely visible */
+.net .edge {
+  fill: none;
+  stroke: rgba(57, 255, 136, 0.09);
+  stroke-width: 1;
+}
+
+/* Pulsed edges: one short dash travels the edge (see note above) */
+.net .edge.pulse {
+  stroke: rgba(57, 255, 136, 0.7);
+  stroke-dasharray: 0.05 0.95;
+  animation: net-pulse 4s linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+@keyframes net-pulse {
+  0%   { stroke-dashoffset: 0; opacity: 0; }
+  5%   { opacity: 0.85; }
+  55%  { opacity: 0.85; }
+  100% { stroke-dashoffset: -1; opacity: 0; }
+}
+
+/* Nodes: dark core with a glowing stroke + a soft halo behind it */
+.net .core {
+  fill: rgba(10, 16, 13, 0.9);
+  stroke: #39ff88;
+  stroke-width: 1.2;
+  animation: net-node 4s linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+@keyframes net-node {
+  0%, 100% { stroke-opacity: 0.35; fill: rgba(10, 16, 13, 0.9); }
+  20%      { stroke-opacity: 1; fill: rgba(57, 255, 136, 0.25); }
+  50%      { stroke-opacity: 0.6; fill: rgba(57, 255, 136, 0.08); }
+}
+
+.net .halo {
+  fill: #39ff88;
+  opacity: 0;
+  animation: net-halo 4s linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+@keyframes net-halo {
+  0%, 100% { opacity: 0; }
+  20%      { opacity: 0.28; }
+}
+
+.net-label {
+  fill: #39ff88;
+  opacity: 0.6;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-anchor: middle;
+}
+
+@media (max-width: 860px) {
+  .code-panel, .shell, .net { display: none; }
+}
+
+/* Short viewports: the panel would cover the centered text */
+@media (max-height: 640px) {
+  .net { display: none; }
+}
+
 /* Accessibility: respect reduced-motion, show everything immediately */
 @media (prefers-reduced-motion: reduce) {
   .line, .glitch, .denied, .body {
@@ -348,4 +606,16 @@ main {
   .matrix span { animation: none; }
   .wave { animation: none; opacity: 1; }
   .wave i { animation: none; transform: scaleY(0.3); }
+  .code-scroll { animation: none; }
+  .shell .cursor { animation: none; }
+  .net .edge.pulse, .net .core, .net .halo {
+    animation: none;
+  }
+  .net .edge.pulse {
+    stroke: rgba(57, 255, 136, 0.22);
+    stroke-dasharray: none;
+    opacity: 1;
+  }
+  .net .core { stroke-opacity: 0.55; }
+  .net .halo { opacity: 0.12; }
 }

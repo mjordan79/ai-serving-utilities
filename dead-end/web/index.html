@@ -12,7 +12,7 @@
   <div class="fx fx-scanlines" aria-hidden="true"></div>
   <div class="fx fx-vignette" aria-hidden="true"></div>
   <div class="grid" aria-hidden="true"></div>
-    <!-- Matrix code: 11 binary columns, pure CSS (see .matrix in style.css).
+    <!-- Matrix code: 21 binary columns, pure CSS (see .matrix in style.css).
        Each span: one continuous string of 96 digits on a single line; CSS
        wraps one digit per line (pre-wrap + word-break: break-all + width: 1ch).
        The 48-digit half is written twice so the -50% translateY loop is seamless. -->
@@ -28,7 +28,237 @@
     <span>001100101010011000110010100110011001010100110010001100101010011000110010100110011001010100110010</span>
     <span>101101000010110110110100001011010110100001011011101101000010110110110100001011010110100001011011</span>
     <span>010110101011010010110100101101000101101010110100010110101011010010110100101101000101101010110100</span>
+    <span>110100101101011101001000100111010010010110100111110100101101011101001000100111010010010110100111</span>
+    <span>010011011010111001010110001101011001101000110101010011011010111001010110001101011001101000110101</span>
+    <span>101101100101000110101011110010001110010101101001101101100101000110101011110010001110010101101001</span>
+    <span>011000110101111001101100010101110001101010011011011000110101111001101100010101110001101010011011</span>
+    <span>110010010111011101011000101100110010001101101010110010010111011101011000101100110010001101101010</span>
+    <span>001110101000110100110101100011101001011001011100001110101000110100110101100011101001011001011100</span>
+    <span>100110101110011011000101101101011001000101101000100110101110011011000101101101011001000101101000</span>
+    <span>011100010110101011010011011010001011110100101101011100010110101011010011011010001011110100101101</span>
+    <span>110110100011001101010111100001101001011011001010110110100011001101010111100001101001011011001010</span>
+    <span>010001101100110010011010011101101001100101011010010001101100110010011010011101101001100101011010</span>
   </div>
+
+    <!-- Background shell panel: simulated interactive kubectl session,
+       driven by shell.js (typing, output, clear, infinite loop). The
+       #shell-tty box has a FIXED height (see .shell-body in style.css);
+       JS trims the oldest lines so it never overflows. aria-hidden:
+       it's texture, not content. -->
+    <div class="shell" aria-hidden="true">
+      <div class="panel-title">root@digitalnucleus — ssh -p 2222 prod-eu-1</div>
+      <div class="shell-body" id="shell-tty"></div>
+    </div>
+
+    <!-- Background bash code panel: same scrolling technique as .code-panel
+       (content written twice → translateY(-50%) seamless loop), but pinned
+       to the LEFT column below the kubectl shell. A diagnostic shell script
+       from the same fake prod world. -->
+    <div class="code-panel bash-panel" aria-hidden="true">
+      <div class="panel-title">root@digitalnucleus:~/ops$ cat check-carrier.sh</div>
+      <div class="code-clip">
+        <div class="code-scroll">
+          <code><span class="c-com">#!/usr/bin/env bash</span>
+<span class="c-com"># check-carrier.sh · telco-gateway · prod-eu-1</span>
+<span class="c-com"># last run: 2026-08-24 05:57 UTC · exit 3 (NO CARRIER)</span>
+
+<span class="c-kw">set</span> -euo pipefail
+
+GATEWAY=<span class="c-str">"10.4.2.17:8443"</span>
+NS=<span class="c-str">"telco"</span>
+
+<span class="c-ann">echo</span> <span class="c-str">"&gt;&gt; probing gateway ${GATEWAY} ..."</span>
+<span class="c-ann">curl</span> -fsSk <span class="c-str">"https://${GATEWAY}/api/v1/lines/70001/status"</span> \
+    -H <span class="c-str">"Authorization: Bearer ${LINE_API_KEY}"</span> \
+    | <span class="c-ann">jq</span> -r <span class="c-str">'.status'</span> || <span class="c-ann">echo</span> <span class="c-str">"no response"</span>
+
+POD=$(<span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> get pods \
+    -l app=telco-gateway <span class="c-str">-o jsonpath='{.items[0].metadata.name}'</span>)
+<span class="c-ann">echo</span> <span class="c-str">"&gt;&gt; active pod: ${POD}"</span>
+
+<span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> logs <span class="c-str">"${POD}"</span> --tail=25 \
+    | <span class="c-ann">grep</span> -E <span class="c-str">"DEGRADED|NO CARRIER"</span>
+
+<span class="c-kw">if</span> ! <span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> get endpoints telco-gateway \
+    | <span class="c-ann">grep</span> -q 10.4; <span class="c-kw">then</span>
+    <span class="c-ann">echo</span> <span class="c-str">"WARN: no ready endpoints on telco-gateway"</span> &gt;&amp;2
+<span class="c-kw">fi</span>
+
+<span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> top pod <span class="c-str">"${POD}"</span> --no-headers || true
+
+<span class="c-ann">echo</span> <span class="c-str">"&gt;&gt; dialing test line 70001 ..."</span>
+OUT=$(<span class="c-ann">curl</span> -fsSk -X POST <span class="c-str">"https://${GATEWAY}/api/v1/lines/70001/dial"</span> \
+    -H <span class="c-str">"Content-Type: application/json"</span> \
+    -d <span class="c-str">'{"caller":"ops","digits":"0011"}'</span>)
+
+<span class="c-kw">if</span> [ $(<span class="c-ann">echo</span> <span class="c-str">"${OUT}"</span> | <span class="c-ann">jq</span> -r <span class="c-str">'.result'</span>) != <span class="c-str">"CONNECTED"</span> ]; <span class="c-kw">then</span>
+    <span class="c-ann">echo</span> <span class="c-str">"ERROR: dial failed — ${OUT}"</span> &gt;&amp;2
+    <span class="c-kw">exit</span> 3
+<span class="c-kw">fi</span>
+
+<span class="c-ann">echo</span> <span class="c-str">"OK: line reachable"</span>
+</code>
+          <code><span class="c-com">#!/usr/bin/env bash</span>
+<span class="c-com"># check-carrier.sh · telco-gateway · prod-eu-1</span>
+<span class="c-com"># last run: 2026-08-24 05:57 UTC · exit 3 (NO CARRIER)</span>
+
+<span class="c-kw">set</span> -euo pipefail
+
+GATEWAY=<span class="c-str">"10.4.2.17:8443"</span>
+NS=<span class="c-str">"telco"</span>
+
+<span class="c-ann">echo</span> <span class="c-str">"&gt;&gt; probing gateway ${GATEWAY} ..."</span>
+<span class="c-ann">curl</span> -fsSk <span class="c-str">"https://${GATEWAY}/api/v1/lines/70001/status"</span> \
+    -H <span class="c-str">"Authorization: Bearer ${LINE_API_KEY}"</span> \
+    | <span class="c-ann">jq</span> -r <span class="c-str">'.status'</span> || <span class="c-ann">echo</span> <span class="c-str">"no response"</span>
+
+POD=$(<span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> get pods \
+    -l app=telco-gateway <span class="c-str">-o jsonpath='{.items[0].metadata.name}'</span>)
+<span class="c-ann">echo</span> <span class="c-str">"&gt;&gt; active pod: ${POD}"</span>
+
+<span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> logs <span class="c-str">"${POD}"</span> --tail=25 \
+    | <span class="c-ann">grep</span> -E <span class="c-str">"DEGRADED|NO CARRIER"</span>
+
+<span class="c-kw">if</span> ! <span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> get endpoints telco-gateway \
+    | <span class="c-ann">grep</span> -q 10.4; <span class="c-kw">then</span>
+    <span class="c-ann">echo</span> <span class="c-str">"WARN: no ready endpoints on telco-gateway"</span> &gt;&amp;2
+<span class="c-kw">fi</span>
+
+<span class="c-ann">kubectl</span> -n <span class="c-str">"${NS}"</span> top pod <span class="c-str">"${POD}"</span> --no-headers || true
+
+<span class="c-ann">echo</span> <span class="c-str">"&gt;&gt; dialing test line 70001 ..."</span>
+OUT=$(<span class="c-ann">curl</span> -fsSk -X POST <span class="c-str">"https://${GATEWAY}/api/v1/lines/70001/dial"</span> \
+    -H <span class="c-str">"Content-Type: application/json"</span> \
+    -d <span class="c-str">'{"caller":"ops","digits":"0011"}'</span>)
+
+<span class="c-kw">if</span> [ $(<span class="c-ann">echo</span> <span class="c-str">"${OUT}"</span> | <span class="c-ann">jq</span> -r <span class="c-str">'.result'</span>) != <span class="c-str">"CONNECTED"</span> ]; <span class="c-kw">then</span>
+    <span class="c-ann">echo</span> <span class="c-str">"ERROR: dial failed — ${OUT}"</span> &gt;&amp;2
+    <span class="c-kw">exit</span> 3
+<span class="c-kw">fi</span>
+
+<span class="c-ann">echo</span> <span class="c-str">"OK: line reachable"</span>
+</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Background code panel: transparent terminal window with a Spring
+       Boot controller, slowly scrolling. Content is written twice so the
+       translateY(-50%) loop is seamless (same trick as .matrix). -->
+    <div class="code-panel" aria-hidden="true">
+      <div class="panel-title">root@digitalnucleus:~/gateway/src/main/java$ cat LineController.java</div>
+      <div class="code-clip">
+        <div class="code-scroll">
+          <code><span class="c-com">// LineController.java · telco-gateway</span>
+<span class="c-com">// last deploy: 2026-08-11 04:12 UTC · health: DEGRADED</span>
+
+<span class="c-kw">package</span> it.telco.gateway.api;
+
+<span class="c-ann">@RestController</span>
+<span class="c-ann">@RequestMapping</span>(<span class="c-str">"/api/v1/lines"</span>)
+<span class="c-kw">public class</span> LineController {
+
+    <span class="c-kw">private final</span> LineService lines;
+
+    <span class="c-kw">public</span> LineController(LineService lines) {
+        <span class="c-kw">this</span>.lines = lines;
+    }
+
+    <span class="c-ann">@GetMapping</span>(<span class="c-str">"/{lineId}/status"</span>)
+    <span class="c-kw">public</span> ResponseEntity&lt;LineStatus&gt; status(
+            <span class="c-ann">@PathVariable</span> String lineId) {
+        <span class="c-kw">return</span> lines.inspect(lineId)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .build());
+    }
+
+    <span class="c-ann">@PostMapping</span>(<span class="c-str">"/{lineId}/dial"</span>)
+    <span class="c-kw">public</span> ResponseEntity&lt;DialResult&gt; dial(
+            <span class="c-ann">@PathVariable</span> String lineId,
+            <span class="c-ann">@RequestBody</span> DialRequest req) {
+        <span class="c-kw">if</span> (!lines.isProvisioned(lineId)) {
+            log.warn(<span class="c-str">"dial rejected, line {}"</span>, lineId);
+            <span class="c-kw">return</span> ResponseEntity
+                .status(HttpStatus.GATEWAY_UNAVAILABLE)
+                .build();
+        }
+        DialResult res = lines.place(req);
+        <span class="c-kw">return</span> ResponseEntity.ok(res);
+    }
+
+    <span class="c-ann">@ExceptionHandler</span>(LineNotProvisioned.<span class="c-kw">class</span>)
+    ResponseEntity&lt;ProblemDetail&gt; carrier(LineNotProvisioned ex) {
+        <span class="c-kw">return</span> ResponseEntity
+            .status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ProblemDetail.of(<span class="c-str">"NO CARRIER"</span>));
+    }
+}
+</code>
+          <code><span class="c-com">// LineController.java · telco-gateway</span>
+<span class="c-com">// last deploy: 2026-08-11 04:12 UTC · health: DEGRADED</span>
+
+<span class="c-kw">package</span> it.telco.gateway.api;
+
+<span class="c-ann">@RestController</span>
+<span class="c-ann">@RequestMapping</span>(<span class="c-str">"/api/v1/lines"</span>)
+<span class="c-kw">public class</span> LineController {
+
+    <span class="c-kw">private final</span> LineService lines;
+
+    <span class="c-kw">public</span> LineController(LineService lines) {
+        <span class="c-kw">this</span>.lines = lines;
+    }
+
+    <span class="c-ann">@GetMapping</span>(<span class="c-str">"/{lineId}/status"</span>)
+    <span class="c-kw">public</span> ResponseEntity&lt;LineStatus&gt; status(
+            <span class="c-ann">@PathVariable</span> String lineId) {
+        <span class="c-kw">return</span> lines.inspect(lineId)
+            .map(ResponseEntity::ok)
+            .orElseGet(() -> ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .build());
+    }
+
+    <span class="c-ann">@PostMapping</span>(<span class="c-str">"/{lineId}/dial"</span>)
+    <span class="c-kw">public</span> ResponseEntity&lt;DialResult&gt; dial(
+            <span class="c-ann">@PathVariable</span> String lineId,
+            <span class="c-ann">@RequestBody</span> DialRequest req) {
+        <span class="c-kw">if</span> (!lines.isProvisioned(lineId)) {
+            log.warn(<span class="c-str">"dial rejected, line {}"</span>, lineId);
+            <span class="c-kw">return</span> ResponseEntity
+                .status(HttpStatus.GATEWAY_UNAVAILABLE)
+                .build();
+        }
+        DialResult res = lines.place(req);
+        <span class="c-kw">return</span> ResponseEntity.ok(res);
+    }
+
+    <span class="c-ann">@ExceptionHandler</span>(LineNotProvisioned.<span class="c-kw">class</span>)
+    ResponseEntity&lt;ProblemDetail&gt; carrier(LineNotProvisioned ex) {
+        <span class="c-kw">return</span> ResponseEntity
+            .status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(ProblemDetail.of(<span class="c-str">"NO CARRIER"</span>));
+    }
+}
+</code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Background neural-net panel: procedurally generated SVG graph
+       (input → dense·1 → dense·2 → output), built by graph.js. Classic
+       circle nodes on straight edges; a 4s forward-pass wave lights the
+       columns left→right and staggered dash-pulses travel the edges.
+       aria-hidden: texture, not content. -->
+    <div class="net" aria-hidden="true">
+      <div class="panel-title">net · 6-8-8-4 · forward pass</div>
+      <div class="net-body">
+        <svg id="net-svg" viewBox="0 0 440 252" aria-hidden="true"></svg>
+
+      </div>
+    </div>
 
   <main>
     <p class="line">&gt; INCOMING CONNECTION</p>
@@ -49,7 +279,9 @@
       There is nothing here.<br>
       There is nothing to see.
     </p>
-    <p class="body leave">Close this tab.<span class="cursor" aria-hidden="true">▌</span></p>
+    <p class="body leave">Staying here might be dangerous. Your IP is logged.<br>Close this tab.<span class="cursor" aria-hidden="true">▌</span></p>
   </main>
+  <script src="shell.js" defer></script>
+  <script src="graph.js" defer></script>
 </body>
 </html>
