@@ -50,6 +50,7 @@ services:
 
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/web:/usr/share/nginx/html/dead-end:ro
       - muse-nginx-certs:/etc/nginx/certs
       - muse-nginx-html:/usr/share/nginx/html
 

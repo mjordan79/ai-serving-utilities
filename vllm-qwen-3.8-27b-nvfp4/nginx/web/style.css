@@ -1,0 +1,249 @@
+/* Root page — dead line. Cold, CRT-terminal aesthetic. Pure CSS.
+   Intentionally reveals nothing about the service behind this host. */
+
+:root {
+  --bg: #060709;
+  --fg: #c8ccd4;
+  --dim: #565b66;
+  --red: #ff3b3b;
+  --mono: "Cascadia Code", "JetBrains Mono", "Fira Code", Consolas, "Liberation Mono", monospace;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--mono);
+  font-size: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+/* ---------- background layers ---------- */
+
+.grid {
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 75% 65% at 50% 50%, black 0%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 75% 65% at 50% 50%, black 0%, transparent 80%);
+  pointer-events: none;
+}
+
+.fx-scanlines {
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.22) 0px,
+    rgba(0, 0, 0, 0.22) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  pointer-events: none;
+  z-index: 10;
+}
+
+.fx-vignette {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(ellipse 90% 80% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.65) 100%);
+  pointer-events: none;
+  z-index: 9;
+}
+
+/* ---------- matrix code (pure CSS) ---------- */
+/* Binary code falling down: each column is a <span> holding one 0/1 per
+   line (white-space: pre, so line-height reliably sets the fall rhythm).
+   The 48-digit half is written TWICE inside the span, so animating
+   translateY from 0 to -50% (of the span's own height) loops with no
+   visible seam.
+   11 columns with different left/size/speed/opacity read as depth.
+   transform-only animation → composited, GPU-friendly.
+   Line-height is a uniform 26px so the cover height is predictable:
+   96 chars × 26px = 2496px, half = 1248px ≥ any common viewport height,
+   which is what makes the loop gap-free. */
+.matrix {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.matrix span {
+  position: absolute;
+  top: 0;
+  white-space: pre;
+  font-family: var(--mono);
+  color: #39ff88;
+  text-shadow: 0 0 6px rgba(57, 255, 136, 0.35);
+  line-height: 26px;
+  user-select: none;
+  will-change: transform;
+  animation: matrix-fall var(--dur, 10s) linear infinite;
+  animation-delay: var(--delay, 0s);
+  opacity: var(--op, 0.08);
+}
+
+@keyframes matrix-fall {
+  to { transform: translateY(-50%); }
+}
+
+/* Per-column: position, size, duration, negative delay (desyncs the
+   start so columns are mid-fall on page load), opacity. */
+.matrix span:nth-child(1)  { left: 3%;  font-size: 11px; --dur: 9s;    --delay: -2s;   --op: 0.10; }
+.matrix span:nth-child(2)  { left: 11%; font-size: 13px; --dur: 13s;   --delay: -7s;   --op: 0.06; }
+.matrix span:nth-child(3)  { left: 20%; font-size: 10px; --dur: 7s;    --delay: -4s;   --op: 0.12; }
+.matrix span:nth-child(4)  { left: 29%; font-size: 14px; --dur: 15s;   --delay: -9s;   --op: 0.05; }
+.matrix span:nth-child(5)  { left: 38%; font-size: 11px; --dur: 10s;   --delay: -1s;   --op: 0.09; }
+.matrix span:nth-child(6)  { left: 47%; font-size: 15px; --dur: 12s;   --delay: -6s;   --op: 0.07; }
+.matrix span:nth-child(7)  { left: 56%; font-size: 10px; --dur: 8s;    --delay: -3s;   --op: 0.11; }
+.matrix span:nth-child(8)  { left: 65%; font-size: 13px; --dur: 14s;   --delay: -10s;  --op: 0.05; }
+.matrix span:nth-child(9)  { left: 74%; font-size: 12px; --dur: 11s;   --delay: -5s;   --op: 0.09; }
+.matrix span:nth-child(10) { left: 83%; font-size: 10px; --dur: 7.5s;  --delay: -2.5s; --op: 0.12; }
+.matrix span:nth-child(11) { left: 92%; font-size: 14px; --dur: 13.5s; --delay: -8s;   --op: 0.06; }
+
+/* ---------- content ---------- */
+
+main {
+  position: relative;
+  z-index: 5;
+  text-align: left;
+  line-height: 1.8;
+  padding: 2rem;
+  max-width: 36rem;
+}
+
+.line {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+  overflow: hidden;
+  white-space: nowrap;
+  width: 0;
+  animation: type-in 0.9s steps(34, end) forwards;
+}
+
+.line + .line { margin-top: 0.4rem; }
+.line:nth-child(1) { animation-delay: 0.3s; }
+.line:nth-child(2) { animation-delay: 1.3s; }
+
+@keyframes type-in {
+  to { width: 100%; }
+}
+
+.glitch {
+  position: relative;
+  margin: 1.2rem 0 0.2rem;
+  /* "NO CARRIER" is 10 monospace glyphs (≈ 6em wide); 9.5vw keeps
+     the full word inside the viewport at any width */
+  font-size: clamp(2.5rem, 9.5vw, 7rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.05em;
+  color: var(--fg);
+  opacity: 0;
+  animation:
+    reveal 0.3s steps(4, end) 2.2s forwards,
+    flicker 4s 2.5s infinite;
+}
+
+/* Glitch slices (red/cyan offset) */
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: glitch-slices 2.8s infinite 2.5s;
+}
+
+.glitch::before {
+  color: var(--red);
+  z-index: -1;
+}
+
+.glitch::after {
+  color: #2fd6c3;
+  z-index: -2;
+}
+
+@keyframes reveal {
+  to { opacity: 1; }
+}
+
+@keyframes flicker {
+  0%, 96.5%, 99%, 100% { opacity: 1; }
+  97% { opacity: 0.55; }
+  98.5% { opacity: 0.85; }
+}
+
+@keyframes glitch-slices {
+  0%, 86%, 100% { opacity: 0; transform: none; clip-path: inset(0 0 0 0); }
+  87% { opacity: 0.9; transform: translate(-6px, 2px); clip-path: inset(10% 0 55% 0); }
+  90% { opacity: 0.9; transform: translate(5px, -2px); clip-path: inset(45% 0 25% 0); }
+  93% { opacity: 0.9; transform: translate(-3px, 1px); clip-path: inset(70% 0 5% 0); }
+  96% { opacity: 0; }
+}
+
+.denied {
+  margin: 0 0 1.8rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.55em;
+  color: var(--red);
+  text-shadow: 0 0 12px rgba(255, 59, 59, 0.55);
+  opacity: 0;
+  animation: fade-in 0.5s ease-out 2.6s forwards;
+}
+
+.body {
+  margin: 0 0 1.6rem;
+  font-size: 0.88rem;
+  color: var(--dim);
+  opacity: 0;
+  animation: fade-in 0.5s ease-out 2.9s forwards;
+}
+
+.leave {
+  color: var(--fg);
+  animation-delay: 3.2s;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+.cursor {
+  margin-left: 0.2em;
+  color: var(--red);
+  animation: blink 1.1s steps(1) infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* Accessibility: respect reduced-motion, show everything immediately */
+@media (prefers-reduced-motion: reduce) {
+  .line, .glitch, .denied, .body {
+    animation: none !important;
+    opacity: 1;
+    width: auto;
+  }
+  .glitch::before, .glitch::after { display: none; }
+  .cursor { animation: none; }
+  .matrix span { animation: none; }
+}
