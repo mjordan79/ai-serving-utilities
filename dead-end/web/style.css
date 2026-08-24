@@ -62,8 +62,12 @@ body {
 }
 
 /* ---------- matrix code (pure CSS) ---------- */
-/* Binary code falling down: each column is a <span> holding one 0/1 per
-   line (white-space: pre, so line-height reliably sets the fall rhythm).
+/* Binary code falling down: each column is a <span> holding one
+   continuous string of 96 digits on a single line. CSS wraps one digit
+   per line: white-space: pre-wrap + word-break: break-all (a digit run
+   has no soft wrap opportunity otherwise) + width: 1ch (every mono
+   digit is exactly 1ch wide), so line-height reliably sets the fall
+   rhythm.
    The 48-digit half is written TWICE inside the span, so animating
    translateY from 0 to -50% (of the span's own height) loops with no
    visible seam.
@@ -83,7 +87,9 @@ body {
 .matrix span {
   position: absolute;
   top: 0;
-  white-space: pre;
+  white-space: pre-wrap;
+  word-break: break-all;
+  width: 1ch;
   font-family: var(--mono);
   color: #39ff88;
   text-shadow: 0 0 6px rgba(57, 255, 136, 0.35);
@@ -197,6 +203,100 @@ main {
   96% { opacity: 0; }
 }
 
+/* ---------- waveform (pure CSS) ---------- */
+/* 48 vertical bars directly under NO CARRIER. The .title wrapper
+   (width: fit-content) shrinks to the h1's rendered width, so the wave
+   tracks the title at any viewport, wrapped or not. Each bar pulses
+   scaleY; staggered NEGATIVE delays spread one crest across the row, so
+   the wave reads as travelling left -> right. transform-only: the 48
+   bars animate on the compositor. */
+.title {
+  width: fit-content;
+}
+
+.wave {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 1.3rem;
+  margin: 0.5rem 0 0.6rem;
+  opacity: 0;
+  animation: fade-in 0.5s ease-out 2.5s forwards;
+}
+
+.wave i {
+  width: 2px;
+  height: 100%;
+  background: #39ff88;
+  border-radius: 1px;
+  opacity: 0.5;
+  box-shadow: 0 0 6px rgba(57, 255, 136, 0.35);
+  transform: scaleY(0.1);
+  transform-origin: center;
+  will-change: transform;
+  animation: wave-pulse 1.4s ease-in-out infinite;
+  animation-delay: var(--wd, 0s);
+}
+
+@keyframes wave-pulse {
+  0%, 100% { transform: scaleY(0.1); }
+  30% { transform: scaleY(1); }
+  55% { transform: scaleY(0.35); }
+}
+
+/* Travel L->R: negative delay grows 0 -> -0.5875s across the 48 bars
+   (step -12.5ms; spread ~0.42 of the 1.4s period = one visible crest).
+   Negative => the wave is already mid-travel on page load. */
+.wave i:nth-child(1)  { --wd: 0s; }
+.wave i:nth-child(2)  { --wd: -0.0125s; }
+.wave i:nth-child(3)  { --wd: -0.025s; }
+.wave i:nth-child(4)  { --wd: -0.0375s; }
+.wave i:nth-child(5)  { --wd: -0.05s; }
+.wave i:nth-child(6)  { --wd: -0.0625s; }
+.wave i:nth-child(7)  { --wd: -0.075s; }
+.wave i:nth-child(8)  { --wd: -0.0875s; }
+.wave i:nth-child(9)  { --wd: -0.1s; }
+.wave i:nth-child(10) { --wd: -0.1125s; }
+.wave i:nth-child(11) { --wd: -0.125s; }
+.wave i:nth-child(12) { --wd: -0.1375s; }
+.wave i:nth-child(13) { --wd: -0.15s; }
+.wave i:nth-child(14) { --wd: -0.1625s; }
+.wave i:nth-child(15) { --wd: -0.175s; }
+.wave i:nth-child(16) { --wd: -0.1875s; }
+.wave i:nth-child(17) { --wd: -0.2s; }
+.wave i:nth-child(18) { --wd: -0.2125s; }
+.wave i:nth-child(19) { --wd: -0.225s; }
+.wave i:nth-child(20) { --wd: -0.2375s; }
+.wave i:nth-child(21) { --wd: -0.25s; }
+.wave i:nth-child(22) { --wd: -0.2625s; }
+.wave i:nth-child(23) { --wd: -0.275s; }
+.wave i:nth-child(24) { --wd: -0.2875s; }
+.wave i:nth-child(25) { --wd: -0.3s; }
+.wave i:nth-child(26) { --wd: -0.3125s; }
+.wave i:nth-child(27) { --wd: -0.325s; }
+.wave i:nth-child(28) { --wd: -0.3375s; }
+.wave i:nth-child(29) { --wd: -0.35s; }
+.wave i:nth-child(30) { --wd: -0.3625s; }
+.wave i:nth-child(31) { --wd: -0.375s; }
+.wave i:nth-child(32) { --wd: -0.3875s; }
+.wave i:nth-child(33) { --wd: -0.4s; }
+.wave i:nth-child(34) { --wd: -0.4125s; }
+.wave i:nth-child(35) { --wd: -0.425s; }
+.wave i:nth-child(36) { --wd: -0.4375s; }
+.wave i:nth-child(37) { --wd: -0.45s; }
+.wave i:nth-child(38) { --wd: -0.4625s; }
+.wave i:nth-child(39) { --wd: -0.475s; }
+.wave i:nth-child(40) { --wd: -0.4875s; }
+.wave i:nth-child(41) { --wd: -0.5s; }
+.wave i:nth-child(42) { --wd: -0.5125s; }
+.wave i:nth-child(43) { --wd: -0.525s; }
+.wave i:nth-child(44) { --wd: -0.5375s; }
+.wave i:nth-child(45) { --wd: -0.55s; }
+.wave i:nth-child(46) { --wd: -0.5625s; }
+.wave i:nth-child(47) { --wd: -0.575s; }
+.wave i:nth-child(48) { --wd: -0.5875s; }
+
 .denied {
   margin: 0 0 1.8rem;
   font-size: 0.95rem;
@@ -246,4 +346,6 @@ main {
   .glitch::before, .glitch::after { display: none; }
   .cursor { animation: none; }
   .matrix span { animation: none; }
+  .wave { animation: none; opacity: 1; }
+  .wave i { animation: none; transform: scaleY(0.3); }
 }
