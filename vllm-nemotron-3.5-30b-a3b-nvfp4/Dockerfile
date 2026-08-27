@@ -14,13 +14,5 @@ ENV TZ=Europe/Rome
 # Copy and set the entrypoint
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-
-# Tuned MoE kernel configs (generated with benchmarks/kernels/benchmark_moe.py
-# --tune, procedure in nemotron.issue). Copied additively into the vLLM
-# configs dir: the default configs bundled in the image are preserved. The
-# README.md inside moe-configs/ keeps this COPY valid before the tuned JSON
-# exists.
-COPY moe-configs/ /usr/local/lib/python3.12/dist-packages/vllm/model_executor/layers/fused_moe/configs/
-
 # Launch vLLM with the OpenAI-compatible API
 ENTRYPOINT ["/entrypoint.sh"]
