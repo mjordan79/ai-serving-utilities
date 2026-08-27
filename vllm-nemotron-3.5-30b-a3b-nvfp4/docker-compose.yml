@@ -1,0 +1,116 @@
+# Pinned project name: decouples compose state (volumes, networks) from the folder name.
+name: vllm-nemotron-35-30b-a3b-nvfp4
+
+services:
+  vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: vllm-nemotron-server
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 600s
+
+    networks:
+      - nemotron-net
+
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    environment:
+      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+      - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR
+      # V2 model runner fails its UVA buffer check on WSL2/WDDM (validated Gemma
+      # post-mortem) — hybrid Mamba/attention models default to the V2 runner,
+      # so pin the V1 runner.
+      - VLLM_USE_V2_MODEL_RUNNER=0
+
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MODEL_NAME
+      # Pass-through: if set in .env the entrypoint uses this key; if empty the
+      # entrypoint generates and persists sk-<uuid> in the vllm-keys volume.
+      - VLLM_API_KEY
+      - ENABLE_API_KEY
+      - DTYPE
+      - SAFETENSORS_LOAD_STRATEGY
+      - TP_SIZE
+      - ATTENTION_BACKEND
+      - PERFORMANCE_MODE
+      - LANGUAGE_MODEL_ONLY
+      - SKIP_MM_PROFILING
+      - KV_CACHE_DTYPE
+      - GPU_MEMORY_UTILIZATION
+      - MAX_MODEL_LEN
+      - MAX_NUM_SEQS
+      - MAX_NUM_BATCHED_TOKENS
+      - ENABLE_CHUNKED_PREFILL
+      - ENABLE_PREFIX_CACHING
+      - ENABLE_HYBRID_KV_CACHE_MANAGER
+      # MoE / Mamba backends — recipe base args + Hopper-only overrides
+      # (linear-backend / mamba-ssu-algorithm / async-scheduling stay empty).
+      - MOE_BACKEND
+      - LINEAR_BACKEND
+      - MAMBA_BACKEND
+      - MAMBA_CACHE_MODE
+      - MAMBA_SSU_ALGORITHM
+      - MAMBA_SSM_CACHE_DTYPE
+      - ENABLE_MAMBA_CACHE_STOCHASTIC_ROUNDING
+      - MAMBA_CACHE_PHILOX_ROUNDS
+      - ASYNC_SCHEDULING
+      - REASONING_PARSER
+      - ENABLE_AUTO_TOOL_CHOICE
+      - TOOL_CALL_PARSER
+      - QUANTIZATION
+      - ENABLE_MTP
+      - MTP_NUM_SPECULATIVE_TOKENS
+      - MTP_MOE_BACKEND
+      - TRUST_REMOTE_CODE
+      - ENABLE_PROMPT_TOKENS_DETAILS
+      - ENABLE_REQUEST_METRICS
+      - DISABLE_LOG_STATS
+      # Raw extra flags appended verbatim to `vllm serve` (escape hatch).
+      - EXTRA_ARGS_STR
+      - PORT
+      # --- HuggingFace ---
+      - HF_TOKEN
+
+    volumes:
+      # Dedicated cache volume: the ~18 GB checkpoint is shared by no other stack.
+      - ${HF_CACHE_VOLUME:-hf-cache-nemotron}:/root/.cache/huggingface
+      - vllm-keys:/root/.vllm-key
+      # FlashInfer autotune cache (see VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR in
+      # entrypoint.sh): without this, every container recreation re-autotunes
+      # ~42 kernel configs at boot (+15-30 s).
+      - vllm-flashinfer-cache:/vllm-cache/flashinfer_autotune
+
+    ports:
+      - "1237:8000"
+
+    ipc: host
+
+networks:
+  nemotron-net:
+    attachable: true
+
+volumes:
+  # Explicit names = deterministic volumes (the project name is pinned above),
+  # so state survives even if the folder or compose file moves.
+  hf-cache-nemotron:
+    name: vllm-nemotron-35-30b-a3b-nvfp4_hf-cache-nemotron
+  vllm-keys:
+    name: vllm-nemotron-35-30b-a3b-nvfp4_vllm-keys
+  vllm-flashinfer-cache:
+    name: vllm-nemotron-35-30b-a3b-nvfp4_vllm-flashinfer-cache
