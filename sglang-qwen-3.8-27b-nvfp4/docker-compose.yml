@@ -1,0 +1,84 @@
+# Pinned project name: decouples compose state (volumes, networks) from the folder name.
+name: sglang-qwen-38-27b-nvfp4
+
+services:
+  sglang:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: sglang-qwen-server
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 600s
+
+    networks:
+      - sglang-net
+
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MODEL_NAME
+      # Pass-through: if set in .env the entrypoint uses this key; if empty the
+      # entrypoint generates and persists sk-<uuid> in the sglang-keys volume.
+      # (Name kept as VLLM_API_KEY for exact parity with the sibling vLLM stacks.)
+      - VLLM_API_KEY
+      - ENABLE_API_KEY
+      - KV_CACHE_DTYPE
+      - MEM_FRACTION_STATIC
+      - ATTENTION_BACKEND
+      - MAX_RUNNING_REQUESTS
+      - CUDA_GRAPH_MAX_BS_DECODE
+      - REASONING_PARSER
+      - TOOL_CALL_PARSER
+      - MAMBA_FULL_MEMORY_RATIO
+      - MAMBA_SSM_DTYPE
+      - MAMBA_RADIX_CACHE_STRATEGY
+      - ALLOW_AUTO_TRUNCATE
+      - TRUST_REMOTE_CODE
+      # --- MTP / speculative decoding (EAGLE) ---
+      # Default is false (no speculative decoding). Set to true to enable the
+      # EAGLE draft flags in the entrypoint. Tuned here (never in .env).
+      - ENABLE_MTP
+      - SPECULATIVE_NUM_STEPS
+      - SPECULATIVE_EAGLE_TOPK
+      - SPECULATIVE_NUM_DRAFT_TOKENS
+      - PORT
+      # --- HuggingFace ---
+      - HF_TOKEN
+
+    volumes:
+      # Default fallback = RadixArk cache (matches documented default variant).
+      - ${HF_CACHE_VOLUME:-hf-cache-radixark}:/root/.cache/huggingface
+      - sglang-keys:/root/.sglang-key
+
+    ports:
+      - "1238:30000"
+
+    ipc: host
+
+networks:
+  sglang-net:
+    attachable: true
+
+volumes:
+  # Explicit names = deterministic volumes (the project name is pinned above),
+  # so state survives even if the folder or compose file moves.
+  hf-cache-radixark:
+    name: sglang-qwen-38-27b-nvfp4_hf-cache-radixark
+  sglang-keys:
+    name: sglang-qwen-38-27b-nvfp4_sglang-keys

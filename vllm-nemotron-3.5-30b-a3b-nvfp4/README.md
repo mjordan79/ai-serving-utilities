@@ -9,7 +9,7 @@ checkpoint (ModelOpt NVFP4 W4A16) from HuggingFace.
 - **Base image:** `vllm/vllm-openai:v0.27.1` (pinned to the minimum version of the official vLLM deployment recipe for this model)
 - **vLLM flags:** base-recipe args (flashinfer Mamba backend, `align` cache mode, prefix caching) + NVFP4 variant (fp8 KV cache, Marlin MoE kernel) + built-in MTP speculative decoding (3 tokens, Triton MoE backend). Hopper-only overrides are exposed but **off by default** (see *Hopper-only overrides*): this repo targets a RTX 5090 (sm_120), which the recipe does not list.
 - **Local endpoint:** `http://localhost:1237` — container `vllm-nemotron-server`
-- **Reverse proxy (optional):** `docker-compose.proxy.yml` on DuckDNS (`nemotron35.duckdns.org`) — see *Reverse Proxy (optional)*. Only one stack may hold ports 80/443 at a time (Qwen on 1235, Muse on 1236, this stack on 1237).
+- **Reverse proxy (optional):** `docker-compose.proxy.yml` on DuckDNS (`your-domain.duckdns.org`) — see *Reverse Proxy (optional)*. Only one stack may hold ports 80/443 at a time (Qwen on 1235, Muse on 1236, this stack on 1237).
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ checkpoint (ModelOpt NVFP4 W4A16) from HuggingFace.
 - The GPU must be **dedicated to this stack** or `GPU_MEMORY_UTILIZATION` lowered accordingly (see *VRAM escalation ladder*). The default 0.88 assumes another vLLM stack (Qwen, ~2.6 GiB resident) shares the card.
 - NVIDIA Container Toolkit (vLLM is started with `runtime: nvidia`).
 - HuggingFace account with access to the gated checkpoint (set `HF_TOKEN`).
-- **Reverse proxy (optional):** a DuckDNS subdomain pointing at the host (default: `nemotron35.duckdns.org`). The domain must resolve before the certificate can be issued.
+- **Reverse proxy (optional):** a DuckDNS subdomain pointing at the host (e.g., `your-domain.duckdns.org`). The domain must resolve before the certificate can be issued.
 
 ## Setup
 
@@ -83,7 +83,7 @@ curl http://localhost:1237/v1/chat/completions \
   }'
 ```
 
-With the reverse proxy, use `https://nemotron35.duckdns.org` in place of `http://localhost:1237`.
+With the reverse proxy, use `https://<your-domain.duckdns.org>` in place of `http://localhost:1237`.
 
 **Coding agents:** the model card recommends forcing non-empty message content so tool calls are not dropped mid-stream. With the Python `openai` client this is a client-side parameter, not server configuration:
 

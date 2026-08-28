@@ -1,5 +1,7 @@
 # Benchmark Suite
 
+![Bash](https://img.shields.io/badge/Bash-4EAAA5?style=for-the-badge&logo=gnu-bash&logoColor=white) ![cURL](https://img.shields.io/badge/cURL-07143E?style=for-the-badge&logo=curl&logoColor=white) ![gawk](https://img.shields.io/badge/gawk-005C4F?style=for-the-badge&logo=gnu&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+
 by Renato Perini (mjordan79)
 
 Curl-based benchmark suite for vLLM deployments. No Python, no external dependencies beyond `bash`, `curl`, `gawk`, `date`.
@@ -44,6 +46,8 @@ The model is selected as the first positional argument (default `qwen`):
 | `qwen` (default) | `vllm-qwen-3.8-27b-nvfp4/` | `vllm-qwen-server` | 1235 |
 | `muse` | `vllm-muse-glimmer-30b-nvfp4/` | `vllm-museglimmer-server` | 1236 |
 
+> **Not yet supported:** `nemotron` (`vllm-nemotron-3.5-30b-a3b-nvfp4/`) and `sglang` (`sglang-qwen-3.8-27b-nvfp4/`) are not wired into the suite yet. Their selectors are planned for a future release; until then the suite covers only the two vLLM targets above.
+
 The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
 
 | .env Variable | Auto-Derived | Used For |
@@ -74,6 +78,8 @@ No `jq` required — all JSON parsing is handled via `gawk`/`sed`.
 cd benchmark
 bash warmup.sh            # default model (qwen)
 bash warmup.sh muse       # target Muse Glimmer
+# bash warmup.sh nemotron # not supported yet (see Target selection)
+# bash warmup.sh sglang   # not supported yet (see Target selection)
 ```
 
 Auto-detects the selected model's `.env`, recovers the API key via Docker, and sends diverse prompts to pre-compile Triton kernels. **Skip this and your first iteration will be artificially slow.**

@@ -18,7 +18,7 @@ by Renato Perini (mjordan79)
 
 ### For remote access via HTTPS (optional)
 
-- **DuckDNS account** with a subdomain (e.g., `my-model.duckdns.org`) — free, up to 5 subdomains
+- **DuckDNS account** with a subdomain (e.g., `your-domain.duckdns.org`) — free, up to 5 subdomains
 - **Ports 80 and 443** forwarded from your router to the Docker host
 - DuckDNS subdomain pointing to your public IP (update at [duckdns.org](https://www.duckdns.org))
 
@@ -50,7 +50,7 @@ MAX_MODEL_LEN=116800
 For remote HTTPS access, also add:
 
 ```env
-LETSENCRYPT_DOMAIN=my-domain.duckdns.org
+LETSENCRYPT_DOMAIN=your-domain.duckdns.org
 LETSENCRYPT_EMAIL=you@example.com
 ```
 

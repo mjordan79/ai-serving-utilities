@@ -1,0 +1,34 @@
+ docker run --gpus all --shm-size 32g -p 30000:30000 \
+    -v test-vol:/root/.cache/huggingface --env "HF_TOKEN=<token>" \
+    --ipc=host lmsysorg/sglang:dev-qwen38-27b-dflash2 sglang serve --trust-remote-code \
+    --model-path RadixArk/Qwen3.8-27B-NVFP4-BF16-LMHead --kv-cache-dtype fp8_e4m3 \
+    --mem-fraction-static 0.94 --attention-backend flashinfer --max-running-requests 1 \
+    --cuda-graph-max-bs 1 --reasoning-parser qwen3 --tool-call-parser qwen3_coder \
+    --mamba-full-memory-ratio 6.08 --host 0.0.0.0 --port 30000 --speculative-algorithm DFLASH \
+    --speculative-draft-model-path incoai/Qwen3.8-27B-DFlash2 --speculative-num-draft-tokens 8 \
+    --chunked-prefill-size 1024 --mamba-radix-cache-strategy extra_buffer --mamba-ssm-dtype bfloat16
+
+docker run --name qwen --rm --gpus all --shm-size 32g -p 30000:30000 \
+    -v test-vol:/root/.cache/huggingface --env "HF_TOKEN=<token>" \
+    --ipc=host lmsysorg/sglang:dev-qwen38-27b-dflash2 sglang serve --trust-remote-code \
+    --model-path RadixArk/Qwen3.8-27B-NVFP4 --kv-cache-dtype fp8_e4m3 \
+    --mem-fraction-static 0.9 --attention-backend flashinfer --max-running-requests 1 \
+    --cuda-graph-max-bs-decode 1 --reasoning-parser qwen3 --tool-call-parser qwen3_coder \
+    --mamba-full-memory-ratio 4.59 --host 0.0.0.0 --port 30000 \
+    --mamba-radix-cache-strategy extra_buffer --mamba-ssm-dtype bfloat16
+    --allow-auto-truncate
+
+docker run --name qwen --rm --gpus all --shm-size 32g -p 30000:30000 \
+    -v test-vol:/root/.cache/huggingface --env "HF_TOKEN=<your-hf-token>" \
+    --ipc=host lmsysorg/sglang:dev-qwen38-27b-dflash2 sglang serve --trust-remote-code \
+    --model-path RadixArk/Qwen3.8-27B-NVFP4 --kv-cache-dtype fp8_e4m3 \
+    --mem-fraction-static 0.94 --attention-backend flashinfer --max-running-requests 1 \
+    --cuda-graph-max-bs-decode 1 --reasoning-parser qwen3 --tool-call-parser qwen3_coder \
+    --mamba-full-memory-ratio 4.59 --host 0.0.0.0 --port 30000 \
+    --speculative-algorithm EAGLE \
+    --speculative-num-steps 3 \
+    --speculative-eagle-topk 1 \
+    --speculative-num-draft-tokens 4 \
+    --enable-linear-replayssm-spec \
+    --mamba-radix-cache-strategy extra_buffer --mamba-ssm-dtype bfloat16
+    --allow-auto-truncate

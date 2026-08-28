@@ -1,6 +1,6 @@
 # Muse Glimmer 30B NVFP4 — vLLM Server
 
-![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Red Hat AI](https://img.shields.io/badge/Red%20Hat%20AI-EE0000?style=for-the-badge) ![vLLM](https://img.shields.io/badge/vLLM-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Red Hat AI](https://img.shields.io/badge/Red%20Hat%20AI-000000?style=for-the-badge&logo=redhat&logoColor=EE0000) ![vLLM](https://img.shields.io/badge/vLLM-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 Docker Compose deployment for [RedHatAI/Muse-Glimmer-30B-NVFP4](https://huggingface.co/RedHatAI/Muse-Glimmer-30B-NVFP4) on vLLM (OpenAI-compatible API) — a dense 29.6B multimodal model (52 layers, 128K context, Apache 2.0) with a ViT-G/14 vision encoder, NVFP4-quantized weights (group-16, Compressed-Tensors format; vision tower and embeddings stay in BF16).
 
