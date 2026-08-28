@@ -63,12 +63,6 @@ TP_SIZE="${TP_SIZE:-1}"
 # 5090 — with it co-running, drop to 0.88 (the 0.92 target of 29.3 GiB sits
 # within ~0.9 GiB of free memory, a WDDM OOM risk under load).
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.92}"
-# 64K: the checkpoint's native context is 1M. 32K (recipe-validated default)
-# broke Copilot serving: GitHub Copilot + vllm-copilot prompts run ~29.5K tokens
-# (instruction files, MCP schemas, editor context) and vLLM hard-rejects any
-# request with max_tokens + prompt > max_model_len — a 32K window left ~3K of
-# output headroom and 400'd deterministically. Cost: ~517K KV tokens / 65536
-# ≈ 8 concurrent 64K sequences instead of ~16 (irrelevant for single-user).
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-65536}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 

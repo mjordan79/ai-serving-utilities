@@ -51,7 +51,6 @@ TP_SIZE="${TP_SIZE:-1}"
 
 # Memory & Context
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.94}"
-# Default 116K — conservative to avoid OOM. Increase to 131072 if VRAM allows.
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-128000}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 
