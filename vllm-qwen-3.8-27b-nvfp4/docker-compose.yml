@@ -39,7 +39,7 @@ services:
 
       # Model runner selection at boot: 0 = V1 (Qwen3.8 default),
       # 1 = V2. V2 [Experimental] requires VLLM_WSL2_ENABLE_PIN_MEMORY=1 (UVA) above.
-      - VLLM_USE_V2_MODEL_RUNNER=0
+      - VLLM_USE_V2_MODEL_RUNNER=1
 
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility

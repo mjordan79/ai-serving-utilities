@@ -52,9 +52,9 @@ TP_SIZE="${TP_SIZE:-1}"
 # Memory & Context
 # Defaults follow the numbers validated by the vLLM recipe on 1x RTX 5090:
 # 28.8/32.6 GB used, ~179K-token KV pool at the full 128K context.
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.92}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.94}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-131072}"
-KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-auto}"
+KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 
 # Throughput
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-1}"
@@ -144,12 +144,6 @@ if [ "$TRUST_REMOTE_CODE" = "true" ]; then
   TRUST_ARGS=(--trust-remote-code)
 fi
 
-# Escape hatch: raw extra flags appended verbatim to `vllm serve`.
-EXTRA_ARGS=()
-if [ -n "$EXTRA_ARGS_STR" ]; then
-  read -r -a EXTRA_ARGS <<< "$EXTRA_ARGS_STR"
-fi
-
 exec vllm serve "$MODEL_NAME" \
   "${API_KEY_ARGS[@]}" \
   --dtype "$DTYPE" \
@@ -176,5 +170,4 @@ exec vllm serve "$MODEL_NAME" \
   "${REQUEST_METRICS_ARGS[@]}" \
   "${DISABLE_LOG_STATS_ARGS[@]}" \
   --uvicorn-log-level warning \
-  --port "$PORT" \
-  "${EXTRA_ARGS[@]}"
+  --port "$PORT"

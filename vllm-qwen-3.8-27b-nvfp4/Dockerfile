@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.27.1
+FROM vllm/vllm-openai:v0.28.0
 
 # Needed for packages that require localization.
 ENV DEBIAN_FRONTEND=noninteractive

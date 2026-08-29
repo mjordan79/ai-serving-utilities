@@ -187,10 +187,10 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
-| `GPU_MEMORY_UTILIZATION` | `0.92` | Fraction of usable VRAM (0.0–1.0) |
+| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
-| `KV_CACHE_DTYPE` | `auto` | KV cache data type (`fp8_e4m3` to halve KV footprint) |
+| `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type (`fp8_e4m3` to halve KV footprint) |
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
 | `PERFORMANCE_MODE` | `interactivity` | vLLM performance mode |
 | `ENABLE_CHUNKED_PREFILL` | `true` | Split long prefills into chunks |
@@ -226,8 +226,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `SAFETENSORS_LOAD_STRATEGY` | `prefetch` | Weight loading strategy |
-| `VLLM_USE_V2_MODEL_RUNNER` | `0` | **Hardcoded in `docker-compose.yml`** (not a pass-through): the V2 model runner UVA buffer check fails on WSL2, so the V1 runner is forced |
-| `EXTRA_ARGS_STR` | `--mm-processor-cache-gb 0` | **Hardcoded in `docker-compose.yml`**: raw flags appended verbatim to `vllm serve`; disables the mm-processor cache (workaround for the "video placeholders" bug on the dev build) |
+| `VLLM_USE_V2_MODEL_RUNNER` | `1` | **Hardcoded in `docker-compose.yml`** (not a pass-through): Muse Glimmer is dense non-hybrid, V2 is default on vLLM 0.28; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` enables UVA on WSL2 |
 | `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `1` | Estimate CUDA-graph memory in the profiler (on) |
 | `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/tmp/flashinfer_autotune_cache` | FlashInfer autotune cache location |
 | `NVIDIA_VISIBLE_DEVICES` | `all` | GPU passthrough |
@@ -242,10 +241,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ## Notes
 
-- **vLLM image:** the deployment builds on `vllm/vllm-openai:muse-glimmer` (the recipe image; `muse_glimmer` parsers are native since vLLM 0.27.0). If that tag is not pullable, build with the fallback base without editing the Dockerfile:
-  ```bash
-  docker compose build --build-arg VLLM_BASE=vllm/vllm-openai:v0.27.1
-  ```
+- **vLLM image:** the deployment builds on `vllm/vllm-openai:v0.28.0` (pinned numeric tag, same pattern as the other stacks). v0.28.0 is the first plain release with the native `muse_glimmer` tool-call parser and first-class configs; `v0.27.1` contains none of them and fails at boot (`KeyError: invalid tool call parser: muse_glimmer`). Do not downgrade to a numeric tag below 0.28.0.
 - **`--generation-config auto`:** if the image rejects the flag on startup, remove the `GENERATION_CONFIG` block from `entrypoint.sh` and rebuild — sampling then comes from the request payloads. Do **not** run the model greedy either way.
 - **Coexistence with the Qwen deployment:** the two stacks run side by side — separate compose project names, containers (`vllm-museglimmer-server` vs `vllm-qwen-server`), host ports (`1236` vs `1235`), HF cache and API-key volumes.
 - **Speculative decoding (DFlash):** off by default — the 5.1 GB draft head (`meta-models/Muse-Glimmer-30B-assistant`, 15 tokens/step) OOMs on a single RTX 5090 (~400 MiB headroom). On a 2x setup with `TP_SIZE=2` the recipe measured ~240 tok/s decode (~3.5x). Enable via `ENABLE_SPEC_DECODING=true` only in that configuration.
