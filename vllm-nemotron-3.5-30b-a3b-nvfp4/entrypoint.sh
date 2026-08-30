@@ -83,16 +83,13 @@ DTYPE="${DTYPE:-auto}"
 TP_SIZE="${TP_SIZE:-1}"
 
 # Memory & Context
-# 0.92: dedicated-card profile (raised from 0.88 on 2026-08-26). At 0.88 the
-# first-boot log showed a 4.05 GiB KV cache; at 0.92 the target is ~5.55 GiB
-# (~37% more KV headroom). Caveat: the Qwen stack holds ~2.6 GiB on the same
-# 5090 — with it co-running, drop to 0.88 (the 0.92 target of 29.3 GiB sits
-# within ~0.9 GiB of free memory, a WDDM OOM risk under load).
+# 0.94: the RTX 5090 is dedicated to this stack — raising utilization buys
+# materially more KV headroom.
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.94}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-65536}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 
-# Throughput — conservative first-boot values on a shared 5090.
+# Throughput — conservative first-boot values.
 # Recipe base: 16384 batched tokens; Hopper escalation: 32768.
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-8}"
 MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-8192}"

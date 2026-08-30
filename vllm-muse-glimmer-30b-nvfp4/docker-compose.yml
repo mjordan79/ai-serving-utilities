@@ -37,8 +37,9 @@ services:
       # staging of attention metadata. Also required for UVA / V2 model runner.
       - VLLM_WSL2_ENABLE_PIN_MEMORY=0
 
-      # Model runner selection at boot: 0 = V1 (Qwen3.8 default),
-      # 1 = V2. V2 [Experimental] requires VLLM_WSL2_ENABLE_PIN_MEMORY=1 (UVA) above.
+      # Model runner selection at boot: 0 = V1 (default for this stack; in
+      # v0.28 only hybrid Mamba/attention models default to V2), 1 = V2.
+      # V2 [Experimental] requires VLLM_WSL2_ENABLE_PIN_MEMORY=1 (UVA) above.
       - VLLM_USE_V2_MODEL_RUNNER=0
 
       - NVIDIA_VISIBLE_DEVICES=all

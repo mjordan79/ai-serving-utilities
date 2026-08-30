@@ -107,7 +107,7 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `ATTENTION_BACKEND` | *(empty)* | Attention backend. Leave empty to let vLLM auto-select; forcing one is not advised on this hybrid architecture (validated failure mode on the Gemma post-mortem) |
 | `PERFORMANCE_MODE` | `interactivity` | vLLM performance mode |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache dtype (NVFP4 variant of the recipe) |
-| `GPU_MEMORY_UTILIZATION` | `0.92` | Fraction of GPU memory for weights + KV cache. Raised 0.88 → 0.92 on 2026-08-26 (dedicated-card profile): at 0.88 the first-boot log showed a 4.05 GiB KV cache vs ~5.55 GiB at full utilization. With the Qwen stack co-running on the same 5090 (~2.6 GiB held), drop to `0.88` — the 0.92 target (29.3 of 31.84 GiB) leaves only ~0.9 GiB of headroom against free memory |
+| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of GPU memory for weights + KV cache. 0.94 targets the dedicated-card profile: the RTX 5090 serves this model exclusively, so higher utilization translates directly into KV cache headroom |
 | `MAX_NUM_SEQS` | `8` | Max concurrent sequences (conservative start; Hopper-only target is 256) |
 | `MAX_NUM_BATCHED_TOKENS` | `8192` | Max batched tokens per step (recipe base is 16384; Hopper-only target is 32768) |
 | `ENABLE_CHUNKED_PREFILL` | `true` | Chunk long prefill to protect TTFT under load |
@@ -169,7 +169,6 @@ If it starts but dies under load, apply the same three dials in the same order.
 - **Model runner:** `VLLM_USE_V2_MODEL_RUNNER=0` is pinned in `docker-compose.yml`: hybrid Mamba/attention models default to the (still experimental) V2 model runner at boot; this stack stays on the V1 runner.
 - **Do not force `ATTENTION_BACKEND`:** forcing a backend on this hybrid architecture is a validated crash mode (Gemma post-mortem). Leave it empty; vLLM auto-selects.
 - **`MAMBA_BACKEND=flashinfer` on sm_120:** the recipe pins flashinfer for the Mamba backend; if it fails to initialize on sm_120, fall back to `MAMBA_BACKEND=triton` in `.env`.
-- **GPU sharing:** the default `GPU_MEMORY_UTILIZATION=0.92` assumes the 5090 is dedicated to this stack. With the Qwen stack (1235) co-running (~2.6 GiB held), boot still succeeds but the 0.92 target sits within ~0.9 GiB of free memory — a WDDM OOM risk under load; use `GPU_MEMORY_UTILIZATION=0.88` in `.env` for the co-running profile.
 
 ## Security posture
 
