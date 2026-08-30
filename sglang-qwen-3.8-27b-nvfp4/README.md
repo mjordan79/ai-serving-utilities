@@ -83,7 +83,7 @@ Once the certificate is ready, access the API at `https://<your-domain.duckdns.o
 
 > **Without the proxy overlay**, the API is exposed directly on port `1238` (HTTP). Compose binds this port on `0.0.0.0` by default, so it is reachable from the LAN, not only localhost. It is Bearer-authenticated, but use the TLS proxy for anything non-local.
 >
-> **Port 80/443 conflict:** this proxy and the sibling `vllm-qwen-3.8-27b-nvfp4` proxy share the same domain and the same host ports 80/443 — they **cannot run at the same time**. Run one proxy at a time. The direct-mode ports do not conflict (Qwen-vLLM `1235`, Qwen-SGLang `1238`).
+> **Port 80/443 conflict:** every proxy overlay in this repo binds the same host ports 80/443 — **only one proxy can run at a time** (this proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same domain). The direct-mode ports do not conflict (Qwen-vLLM `1235`, Muse `1236`, Nemotron `1237`, Qwen-SGLang `1238`).
 
 ### 3. Get your API key
 
@@ -234,7 +234,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
   - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<your-domain.duckdns.org>` (HTTPS, remote)
   - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
   - When proxy mode is active, ports 80/443 are exposed and port 1238 is automatically disabled — all traffic routes through nginx.
-  - **80/443 exclusivity:** the sibling `vllm-qwen-3.8-27b-nvfp4` proxy and this proxy share the same `LETSENCRYPT_DOMAIN` (from each `.env`) and the same host ports 80/443 — run **one** proxy at a time.
+  - **80/443 exclusivity:** every proxy overlay in this repo binds the same host ports 80/443 — run **one** proxy at a time. This proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same `LETSENCRYPT_DOMAIN` (from each `.env`).
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 

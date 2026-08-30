@@ -9,7 +9,7 @@ checkpoint (ModelOpt NVFP4 W4A16) from HuggingFace.
 - **Base image:** `vllm/vllm-openai:v0.27.1` (pinned to the minimum version of the official vLLM deployment recipe for this model)
 - **vLLM flags:** base-recipe args (flashinfer Mamba backend, `align` cache mode, prefix caching) + NVFP4 variant (fp8 KV cache, Marlin MoE kernel) + built-in MTP speculative decoding (3 tokens, Triton MoE backend). Hopper-only overrides are exposed but **off by default** (see *Hopper-only overrides*): this repo targets a RTX 5090 (sm_120), which the recipe does not list.
 - **Local endpoint:** `http://localhost:1237` — container `vllm-nemotron-server`
-- **Reverse proxy (optional):** `docker-compose.proxy.yml` on DuckDNS (`your-domain.duckdns.org`) — see *Reverse Proxy (optional)*. Only one stack may hold ports 80/443 at a time (Qwen on 1235, Muse on 1236, this stack on 1237).
+- **Reverse proxy (optional):** `docker-compose.proxy.yml` on DuckDNS (`your-domain.duckdns.org`) — see *Reverse Proxy (optional)*. Only one stack may hold ports 80/443 at a time (Qwen on 1235, Muse on 1236, this stack on 1237, Qwen-SGLang on 1238).
 
 ## Prerequisites
 
@@ -65,7 +65,7 @@ curl http://localhost:1237/health
 docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d --force-recreate
 ```
 
-Requires the DuckDNS subdomain to be registered first (`LETSENCRYPT_DOMAIN` must resolve). Only one stack at a time may run the proxy overlay (ports 80/443): Qwen (1235), Muse Glimmer (1236), or this stack (1237).
+Requires the DuckDNS subdomain to be registered first (`LETSENCRYPT_DOMAIN` must resolve). Only one stack at a time may run the proxy overlay (ports 80/443): Qwen (1235), Muse Glimmer (1236), Qwen-SGLang (1238), or this stack (1237).
 
 ## Usage
 
