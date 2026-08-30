@@ -22,26 +22,45 @@ if [ -n "$HF_TOKEN" ]; then
   export HF_TOKEN
 fi
 
-# API key: enable with ENABLE_API_KEY=true.
-# If enabled and it doesn't exist, generate a persistent UUID.
-# If enabled and it exists, reuse the saved token.
-# If disabled, no authentication (dev local).
+# API key / authentication (ENABLE_API_KEY, default true).
+#   true : the server starts with --api-key <key>. Key resolution order:
+#           1. $VLLM_API_KEY if set (e.g. from .env): used as-is and written
+#              to the key file (volume: vllm-keys), overwriting any previous key.
+#           2. otherwise the existing key file is reused (persists across rebuilds).
+#           3. otherwise a new sk-<uuid> is generated, persisted, and printed to
+#              the logs (shown only on the startup that creates it).
+#   false: no authentication (local dev only). --api-key is not passed and
+#          VLLM_API_KEY is unset so vLLM's native env-var fallback cannot enable it.
 API_KEY_ARGS=()
 if [ "$ENABLE_API_KEY" = "true" ]; then
+  # Case 1: ENABLE_API_KEY=true and VLLM_API_KEY undefined or empty
   if [ -z "$VLLM_API_KEY" ]; then
     if [ -f "$API_KEY_FILE" ]; then
-      VLLM_API_KEY=$(cat "$API_KEY_FILE")
-      echo "[API] Reusing existing API key."
+      # Reuse existing key
+      VLLM_API_KEY="$(cat "$API_KEY_FILE")"
+      echo "[API] Reusing existing API key from file."
     else
+      # Generate new key
       VLLM_API_KEY="sk-$(cat /proc/sys/kernel/random/uuid 2>/dev/null || python3 -c 'import uuid; print(uuid.uuid4())')"
       mkdir -p "$(dirname "$API_KEY_FILE")"
       echo "$VLLM_API_KEY" > "$API_KEY_FILE"
-      echo "[API] Generated API key: $VLLM_API_KEY"
+      echo "[API] Generated new API key: $VLLM_API_KEY"
       echo "[API] Save this value — it will not be shown again."
     fi
-    export VLLM_API_KEY
+  else
+    # Case 2: ENABLE_API_KEY=true and VLLM_API_KEY is set
+    mkdir -p "$(dirname "$API_KEY_FILE")"
+    echo "$VLLM_API_KEY" > "$API_KEY_FILE"
+    echo "[API] Using API key from environment and writing it to file."
   fi
+
+  export VLLM_API_KEY
   API_KEY_ARGS=(--api-key "$VLLM_API_KEY")
+
+else
+  # Case 3: ENABLE_API_KEY=false -> fully disable auth
+  unset VLLM_API_KEY
+  echo "[API] Auth disabled — server will start without API key."
 fi
 
 # --- Build vLLM arguments from environment variables ---

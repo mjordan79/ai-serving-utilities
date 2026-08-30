@@ -35,13 +35,13 @@ services:
 
       # WSL2 only: Enables non-blocking per-step host -> device
       # staging of attention metadata. Also required for UVA / V2 model runner.
-      - VLLM_WSL2_ENABLE_PIN_MEMORY=1
+      - VLLM_WSL2_ENABLE_PIN_MEMORY=0
 
       # Model runner selection at boot: 0 = V1, 1 = V2 (Muse Glimmer default:
       # dense non-hybrid model → V2 on v0.28, unlike Qwen3.8 → this line is
       # an explicit override, do not remove). V2 [Experimental] requires
       # VLLM_WSL2_ENABLE_PIN_MEMORY=1 (UVA) above.
-      - VLLM_USE_V2_MODEL_RUNNER=1
+      - VLLM_USE_V2_MODEL_RUNNER=0
 
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
