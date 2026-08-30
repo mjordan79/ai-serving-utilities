@@ -32,9 +32,14 @@ services:
     environment:
       - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
       - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR
-      # V2 model runner fails its UVA buffer check on WSL2/WDDM (validated Gemma
-      # post-mortem) — hybrid Mamba/attention models default to the V2 runner,
-      # so pin the V1 runner.
+
+      # WSL2 only: Enables non-blocking per-step host -> device
+      # staging of attention metadata. Also required for UVA / V2 model runner.
+      - VLLM_WSL2_ENABLE_PIN_MEMORY=0
+
+      # Model runner selection at boot: 0 = V1 (pinned — hybrid
+      # Mamba/attention models default to the V2 runner), 1 = V2.
+      # V2 [Experimental] requires VLLM_WSL2_ENABLE_PIN_MEMORY=1 (UVA) above.
       - VLLM_USE_V2_MODEL_RUNNER=0
 
       - NVIDIA_VISIBLE_DEVICES=all
@@ -49,8 +54,6 @@ services:
       - TP_SIZE
       - ATTENTION_BACKEND
       - PERFORMANCE_MODE
-      - LANGUAGE_MODEL_ONLY
-      - SKIP_MM_PROFILING
       - KV_CACHE_DTYPE
       - GPU_MEMORY_UTILIZATION
       - MAX_MODEL_LEN
@@ -72,9 +75,11 @@ services:
       - MAMBA_CACHE_PHILOX_ROUNDS
       - ASYNC_SCHEDULING
       - REASONING_PARSER
-      - ENABLE_AUTO_TOOL_CHOICE
       - TOOL_CALL_PARSER
+      - LANGUAGE_MODEL_ONLY
+      - ENABLE_AUTO_TOOL_CHOICE
       - QUANTIZATION
+      - SKIP_MM_PROFILING
       - ENABLE_MTP
       - MTP_NUM_SPECULATIVE_TOKENS
       - MTP_MOE_BACKEND

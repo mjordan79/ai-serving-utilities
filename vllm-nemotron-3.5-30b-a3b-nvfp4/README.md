@@ -6,7 +6,7 @@ checkpoint (ModelOpt NVFP4 W4A16) from HuggingFace.
 - **Producer:** NVIDIA — **Publisher:** NVIDIA
 - **Architecture:** hybrid Mamba (SSM) + MoE attention — 30B total parameters, ~3B active per token. Because of the hybrid layout vLLM routes it through the V1 model runner on WDDM (see *Known issues*) and applies Mamba-cache flags that a plain dense model would not use.
 - **Model ID:** `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` (~18 GB download)
-- **Base image:** `vllm/vllm-openai:v0.27.1` (pinned to the minimum version of the official vLLM deployment recipe for this model)
+- **Base image:** `vllm/vllm-openai:v0.28.0` (current stable vLLM release; the official deployment recipe's minimum for this model is v0.27.1)
 - **vLLM flags:** base-recipe args (flashinfer Mamba backend, `align` cache mode, prefix caching) + NVFP4 variant (fp8 KV cache, Marlin MoE kernel) + built-in MTP speculative decoding (3 tokens, Triton MoE backend). Hopper-only overrides are exposed but **off by default** (see *Hopper-only overrides*): this repo targets a RTX 5090 (sm_120), which the recipe does not list.
 - **Local endpoint:** `http://localhost:1237` — container `vllm-nemotron-server`
 - **Reverse proxy (optional):** `docker-compose.proxy.yml` on DuckDNS (`your-domain.duckdns.org`) — see *Reverse Proxy (optional)*. Only one stack may hold ports 80/443 at a time (Qwen on 1235, Muse on 1236, this stack on 1237, Qwen-SGLang on 1238).
@@ -166,14 +166,14 @@ If it starts but dies under load, apply the same three dials in the same order.
 
 ## Known issues
 
-- **WDDM / WSL2:** `VLLM_USE_V2_MODEL_RUNNER=0` is hardcoded in `docker-compose.yml`. The vLLM V2 model runner fails its UVA buffer check on WDDM, and hybrid Mamba/attention models default to the V2 runner — without this pin the container crash-loops at startup (validated Gemma post-mortem).
+- **Model runner:** `VLLM_USE_V2_MODEL_RUNNER=0` is pinned in `docker-compose.yml`: hybrid Mamba/attention models default to the (still experimental) V2 model runner at boot; this stack stays on the V1 runner.
 - **Do not force `ATTENTION_BACKEND`:** forcing a backend on this hybrid architecture is a validated crash mode (Gemma post-mortem). Leave it empty; vLLM auto-selects.
 - **`MAMBA_BACKEND=flashinfer` on sm_120:** the recipe pins flashinfer for the Mamba backend; if it fails to initialize on sm_120, fall back to `MAMBA_BACKEND=triton` in `.env`.
 - **GPU sharing:** the default `GPU_MEMORY_UTILIZATION=0.92` assumes the 5090 is dedicated to this stack. With the Qwen stack (1235) co-running (~2.6 GiB held), boot still succeeds but the 0.92 target sits within ~0.9 GiB of free memory — a WDDM OOM risk under load; use `GPU_MEMORY_UTILIZATION=0.88` in `.env` for the co-running profile.
 
 ## Security posture
 
-Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.27.1** (the qwen stack runs v0.28.0): the allowlist is version-agnostic, but the unauthenticated-endpoint list below was probed on v0.28.0 — treat it as an upper bound on what the key fails to protect.
+Same nginx control set as the sibling vLLM stacks. This stack now runs **vLLM v0.28.0** — the same version the unauthenticated-endpoint list below was probed on.
 
 **What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
 

@@ -88,7 +88,7 @@ TP_SIZE="${TP_SIZE:-1}"
 # (~37% more KV headroom). Caveat: the Qwen stack holds ~2.6 GiB on the same
 # 5090 — with it co-running, drop to 0.88 (the 0.92 target of 29.3 GiB sits
 # within ~0.9 GiB of free memory, a WDDM OOM risk under load).
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.92}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.94}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-65536}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 

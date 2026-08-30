@@ -1,4 +1,4 @@
-FROM vllm/vllm-openai:v0.27.1
+FROM vllm/vllm-openai:v0.28.0
 
 # Non-interactive apt operations
 ENV DEBIAN_FRONTEND=noninteractive
