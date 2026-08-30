@@ -204,6 +204,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
+| `VLLM_MAX_N_SEQUENCES` | `16` | Cap on the `n` parameter per `/v1` request (vLLM default 16384) |
 | `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored — the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
 | `DISABLE_LOG_STATS` | `false` | Disable periodic vLLM throughput statistics; requires `ENABLE_REQUEST_METRICS=false` |
@@ -239,9 +240,31 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
   - **Direct** (default): `docker compose up -d` → API on port `1235` (HTTP, LAN-reachable, Bearer-authenticated)
   - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
   - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
-  - When proxy mode is active, ports 80/443 are exposed and port 1235 is automatically disabled — all traffic routes through nginx.
+  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1235:8000` publish (Compose merges lists; an empty list is a no-op). Verified on the running container: port `1235` stays published on the host even in proxy mode. nginx only guards the public 80/443 path — LAN hosts can still reach vLLM directly on 1235, bypassing the nginx allowlist (see Security posture).
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
+
+## Security posture
+
+Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); endpoint claims verified against the running server (vLLM v0.28.0).
+
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in this version (and dev mode is never enabled).
+
+**Controls (nginx, HTTPS path):**
+
+| Control | Value | Purpose |
+|---|---|---|
+| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else → `404` | blocks every unauthenticated endpoint above; endpoints added by future vLLM releases stay blocked by default |
+| Rate limit | 10 req/s per IP, burst 20, then `503` | bounds abuse and queue-flooding |
+| Body-size cap | `client_max_body_size 4m` | the full 116k-token context fits with margin; bounds abuse |
+| TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
+
+**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, the tokenizer-info endpoint, profilers, gRPC, LoRA runtime loading and endpoint plugins are all off by default in this entrypoint.
+
+**Residual risks:**
+
+- Port `1235` stays published on the host in proxy mode (see limitation above) — LAN-only exposure. `/v1/*` is Bearer-authenticated, but the unauthenticated endpoints listed above are reachable on 1235 with no nginx in front.
+- `TRUST_REMOTE_CODE=true` is on by default — a supply-chain trust in the Hugging Face repo, not a runtime API surface. Set `TRUST_REMOTE_CODE=false` only after verifying the checkpoint loads without it.
 
 ## Useful Commands
 

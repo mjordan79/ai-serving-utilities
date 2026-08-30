@@ -171,6 +171,28 @@ If it starts but dies under load, apply the same three dials in the same order.
 - **`MAMBA_BACKEND=flashinfer` on sm_120:** the recipe pins flashinfer for the Mamba backend; if it fails to initialize on sm_120, fall back to `MAMBA_BACKEND=triton` in `.env`.
 - **GPU sharing:** the default `GPU_MEMORY_UTILIZATION=0.92` assumes the 5090 is dedicated to this stack. With the Qwen stack (1235) co-running (~2.6 GiB held), boot still succeeds but the 0.92 target sits within ~0.9 GiB of free memory — a WDDM OOM risk under load; use `GPU_MEMORY_UTILIZATION=0.88` in `.env` for the co-running profile.
 
+## Security posture
+
+Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.27.1** (the qwen stack runs v0.28.0): the allowlist is version-agnostic, but the unauthenticated-endpoint list below was probed on v0.28.0 — treat it as an upper bound on what the key fails to protect.
+
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
+
+**Controls (nginx, HTTPS path):**
+
+| Control | Value | Purpose |
+|---|---|---|
+| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else → `404` | blocks every unauthenticated endpoint above; endpoints added by future vLLM releases stay blocked by default |
+| Rate limit | 10 req/s per IP, burst 20, then `503` | bounds abuse and queue-flooding |
+| Body-size cap | `client_max_body_size 4m` | the full context window fits with margin; bounds abuse |
+| TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
+
+**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, profilers, gRPC and endpoint plugins are off by default in this entrypoint.
+
+**Residual risks:**
+
+- Port `1237` stays published on the host in proxy mode (the overlay's `ports: []` is a no-op — Compose merges lists, as documented in the qwen stack) — LAN-only exposure. The unauthenticated endpoints listed above are reachable on 1237 with no nginx in front.
+- `TRUST_REMOTE_CODE=true` is on by default — a supply-chain trust in the Hugging Face repo, not a runtime API surface. Set `TRUST_REMOTE_CODE=false` only after verifying the checkpoint loads without it.
+
 ## Useful commands
 
 ```sh

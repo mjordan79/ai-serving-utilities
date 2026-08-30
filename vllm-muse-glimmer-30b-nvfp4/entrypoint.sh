@@ -63,6 +63,13 @@ fi
 # --- Build vLLM arguments from environment variables ---
 # Every flag has a default here; override through the container environment to change.
 
+# Security: cap the `n` parameter on /v1 completions. vLLM defaults
+# VLLM_MAX_N_SEQUENCES to 16384 — a single request could ask for 16384
+# parallel sequences. Docs suggest 64/128 for public deployments; 16 is
+# plenty here (MAX_NUM_SEQS serializes generation anyway).
+VLLM_MAX_N_SEQUENCES="${VLLM_MAX_N_SEQUENCES:-16}"
+export VLLM_MAX_N_SEQUENCES
+
 # Model
 MODEL_NAME="${MODEL_NAME:-RedHatAI/Muse-Glimmer-30B-NVFP4}"
 DTYPE="${DTYPE:-auto}"

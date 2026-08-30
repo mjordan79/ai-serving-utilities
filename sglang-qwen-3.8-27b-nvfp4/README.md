@@ -219,6 +219,29 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `LETSENCRYPT_DOMAIN` | *(none)* | Domain for Let's Encrypt certificate (e.g., `your-domain.duckdns.org`) |
 | `LETSENCRYPT_EMAIL` | *(none)* | Email for Let's Encrypt certificate notifications |
 
+## Security posture
+
+The nginx control set is identical to the sibling vLLM stacks (allowlist, rate limit, body cap, TLS). The engine is SGLang, not vLLM:
+
+**Why the allowlist is the main defense:** SGLang exposes a wider native surface than vLLM (`/generate`, `/get_model_info`, `/server_info`, `/v1/models`, `/metrics`, `/abort_request`, ...) and its `--api-key` key coverage is version-dependent. The allowlist keeps every non-`/v1` path blocked regardless of what the key covers — the clients use only the OpenAI-compatible `/v1/*` surface. **Probe at first activation:** with the server up, `GET /v1/models` and one non-`/v1` path (e.g. `/get_model_info`) without a key (expect 401/404) and confirm no client depends on a non-`/v1` path; if one does, extend the allowlist deliberately.
+
+**Controls (nginx, HTTPS path):**
+
+| Control | Value | Purpose |
+|---|---|---|
+| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else → `404` | blocks the entire non-OpenAI native surface |
+| Rate limit | 10 req/s per IP, burst 20, then `503` | bounds abuse and queue-flooding |
+| Body-size cap | `client_max_body_size 4m` | the full context window fits with margin; bounds abuse |
+| TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
+
+**Controls (engine):** no `VLLM_MAX_N_SEQUENCES` equivalent in this stack — the engine is SGLang. Concurrency is bounded by `--max-running-requests` (`MAX_RUNNING_REQUESTS`).
+
+**Residual risks:**
+
+- Port `1238` stays published on the host in proxy mode (see known limitation above) — LAN-only exposure; the non-allowlisted native surface is reachable on 1238 with no nginx in front.
+- `LETSENCRYPT_DOMAIN` is shared with the qwen stack — only one of the two can hold the public 80/443 proxy at a time (see Notes).
+- `TRUST_REMOTE_CODE=true` is on by default — a supply-chain trust in the Hugging Face repo, not a runtime API surface.
+
 ## Notes
 
 - **Image (dev tag):** `lmsysorg/sglang:dev-cu13-qwen38-27b-dflash2` is a **non-versioned dev tag** from the SGLang project. It may change or disappear without notice. Before the first `docker compose build`, verify it exists on Docker Hub (`docker pull lmsysorg/sglang:dev-cu13-qwen38-27b-dflash2`). If a stable SGLang release supports this model + Mamba/EAGLE combo, pin that stable tag instead.
@@ -233,7 +256,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
   - **Direct** (default): `docker compose up -d` → API on port `1238` (HTTP, LAN-reachable, Bearer-authenticated)
   - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<your-domain.duckdns.org>` (HTTPS, remote)
   - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
-  - When proxy mode is active, ports 80/443 are exposed and port 1238 is automatically disabled — all traffic routes through nginx.
+  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1238:30000` publish (Compose merges lists; an empty list is a no-op). Port `1238` stays published on the host even in proxy mode — LAN hosts can reach SGLang directly, bypassing the nginx allowlist (see Security posture).
   - **80/443 exclusivity:** every proxy overlay in this repo binds the same host ports 80/443 — run **one** proxy at a time. This proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same `LETSENCRYPT_DOMAIN` (from each `.env`).
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.

@@ -239,6 +239,28 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `LETSENCRYPT_DOMAIN` | *(none)* | Domain for Let's Encrypt certificate (e.g., `your-domain.duckdns.org`) |
 | `LETSENCRYPT_EMAIL` | *(none)* | Email for Let's Encrypt certificate notifications |
 
+## Security posture
+
+Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); the unauthenticated-endpoint claims below were probed live on the qwen stack (same vLLM v0.28.0) — this stack shares the identical nginx control set.
+
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
+
+**Controls (nginx, HTTPS path):**
+
+| Control | Value | Purpose |
+|---|---|---|
+| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else → `404` | blocks every unauthenticated endpoint above; endpoints added by future vLLM releases stay blocked by default |
+| Rate limit | 10 req/s per IP, burst 20, then `503` | bounds abuse and queue-flooding |
+| Body-size cap | `client_max_body_size 4m` | the full 128k-token context fits with margin; bounds abuse |
+| TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
+
+**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, profilers, gRPC and endpoint plugins are off by default in this entrypoint.
+
+**Residual risks:**
+
+- Port `1236` stays published on the host in proxy mode (see known limitation above) — LAN-only exposure. The unauthenticated endpoints listed above are reachable on 1236 with no nginx in front.
+- `TRUST_REMOTE_CODE=true` is on by default — a supply-chain trust in the Hugging Face repo, not a runtime API surface. Set `TRUST_REMOTE_CODE=false` only after verifying the checkpoint loads without it.
+
 ## Notes
 
 - **vLLM image:** the deployment builds on `vllm/vllm-openai:v0.28.0` (pinned numeric tag, same pattern as the other stacks). v0.28.0 is the first plain release with the native `muse_glimmer` tool-call parser and first-class configs; `v0.27.1` contains none of them and fails at boot (`KeyError: invalid tool call parser: muse_glimmer`). Do not downgrade to a numeric tag below 0.28.0.
@@ -252,7 +274,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
   - **Direct** (default): `docker compose up -d` → API on port `1236` (HTTP, LAN-reachable, Bearer-authenticated)
   - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
   - The proxy overlay adds 3 containers: `muse-docker-gen`, `muse-nginx`, `muse-acme`. Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
-  - When proxy mode is active, ports 80/443 are exposed and port 1236 is automatically disabled — all traffic routes through nginx.
+  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1236:8000` publish (Compose merges lists; an empty list is a no-op). Port `1236` stays published on the host even in proxy mode — LAN hosts can reach vLLM directly, bypassing the nginx allowlist (see Security posture).
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `muse-acme` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 

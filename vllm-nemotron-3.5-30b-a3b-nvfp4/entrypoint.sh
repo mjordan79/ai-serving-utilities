@@ -70,6 +70,13 @@ fi
 # stay OFF by default — the RTX 5090 (sm_120) is not in the recipe's validated
 # hardware matrix. Every override is still exposed as a variable.
 
+# Security: cap the `n` parameter on /v1 completions. vLLM defaults
+# VLLM_MAX_N_SEQUENCES to 16384 — a single request could ask for 16384
+# parallel sequences. Docs suggest 64/128 for public deployments; 16 is
+# plenty here (MAX_NUM_SEQS=8 already bounds concurrent sequences).
+VLLM_MAX_N_SEQUENCES="${VLLM_MAX_N_SEQUENCES:-16}"
+export VLLM_MAX_N_SEQUENCES
+
 # Model
 MODEL_NAME="${MODEL_NAME:-nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4}"
 DTYPE="${DTYPE:-auto}"
