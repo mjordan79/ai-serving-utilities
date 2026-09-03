@@ -5,7 +5,10 @@ API_KEY_FILE="/root/.vllm-key/.api_key"
 
 # Runtime defaults live here so Compose only passes explicit overrides.
 export VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS="${VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS:-1}"
-export VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR="${VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR:-/tmp/flashinfer_autotune_cache}"
+# Point the FlashInfer autotune cache inside the vLLM cache root so a single
+# mounted volume (vllm-caches -> /root/.cache/vllm) persists everything
+# (torch.compile / Inductor / Triton + FlashInfer) across rebuilds/recreates.
+export VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR="${VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR:-/root/.cache/vllm/flashinfer_autotune_cache}"
 ENABLE_API_KEY="${ENABLE_API_KEY:-true}"
 ENABLE_REQUEST_METRICS="${ENABLE_REQUEST_METRICS:-true}"
 DISABLE_LOG_STATS="${DISABLE_LOG_STATS:-false}"

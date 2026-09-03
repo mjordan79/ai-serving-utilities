@@ -84,6 +84,11 @@ services:
       # Default fallback = Unsloth cache (matches documented default variant).
       - ${HF_CACHE_VOLUME:-hf-cache-unsloth}:/root/.cache/huggingface
       - vllm-keys:/root/.vllm-key
+      # vLLM cache root (VLLM_CACHE_ROOT default = /root/.cache/vllm): holds the
+      # torch.compile / Inductor / Triton caches and the FlashInfer autotune cache
+      # (redirected here by the entrypoint). Persisted to skip recompile + autotune
+      # on warm restarts.
+      - vllm-caches:/root/.cache/vllm
 
     ports:
       - "1235:8000"
@@ -103,3 +108,5 @@ volumes:
     name: vllm-qwen-38-27b-nvfp4_hf-cache-unsloth
   vllm-keys:
     name: vllm-qwen-38-27b-nvfp4_vllm-keys
+  vllm-caches:
+    name: vllm-qwen-38-27b-nvfp4_vllm-caches
