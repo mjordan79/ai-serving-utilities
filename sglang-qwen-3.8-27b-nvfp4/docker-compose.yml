@@ -52,6 +52,10 @@ services:
       - MAMBA_RADIX_CACHE_STRATEGY
       - ALLOW_AUTO_TRUNCATE
       - TRUST_REMOTE_CODE
+      # Logging: verbosity + cadence of the throughput stats lines.
+      - LOG_LEVEL
+      - LOG_LEVEL_HTTP
+      - DECODE_LOG_INTERVAL
       # JSON model-config overrides (--json-model-override-args). Default in the
       # entrypoint disables the vision tower; set in .env to {} to re-enable it.
       - JSON_MODEL_OVERRIDE_ARGS

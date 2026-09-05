@@ -61,13 +61,18 @@ fi
 # --- Build SGLang arguments from environment variables ---
 # Every flag has a default here; override through the container environment to change.
 
-# Model card defaults: Gittensor Qwen3.8 with DSpark v2.
+# Gittensor Qwen3.8 + DSpark v2. CONTEXT_LENGTH is the architecture ceiling
+# (checkpoint max_position_embeddings=262144; the effective per-request window
+# is min(262144, KV pool)). MEM_FRACTION_STATIC=0.85 and
+# CHUNKED_PREFILL_SIZE=1024 deviate from the model card (0.90/2048): on this
+# WDDM/WSL2 host the card values overcommitted VRAM (UVM spill), 0.85 is the
+# zero-spill tuning.
 MODEL_NAME="${MODEL_NAME:-gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090}"
 TP_SIZE="${TP_SIZE:-1}"
 CONTEXT_LENGTH="${CONTEXT_LENGTH:-262144}"
-CHUNKED_PREFILL_SIZE="${CHUNKED_PREFILL_SIZE:-2048}"
+CHUNKED_PREFILL_SIZE="${CHUNKED_PREFILL_SIZE:-1024}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
-MEM_FRACTION_STATIC="${MEM_FRACTION_STATIC:-0.90}"
+MEM_FRACTION_STATIC="${MEM_FRACTION_STATIC:-0.85}"
 ATTENTION_BACKEND="${ATTENTION_BACKEND:-flashinfer}"
 MAX_RUNNING_REQUESTS="${MAX_RUNNING_REQUESTS:-2}"
 MAX_MAMBA_CACHE_SIZE="${MAX_MAMBA_CACHE_SIZE:-12}"
@@ -83,6 +88,19 @@ TOOL_CALL_PARSER="${TOOL_CALL_PARSER:-qwen3_coder}"
 # Behavior
 ALLOW_AUTO_TRUNCATE="${ALLOW_AUTO_TRUNCATE:-true}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
+
+# Logging (verbosity aligned with the sibling vLLM stack):
+# - LOG_LEVEL=info keeps the periodic "Decode batch ... gen throughput"
+#   stats lines (they are INFO-level in SGLang; LOG_LEVEL=warning would
+#   suppress them).
+# - LOG_LEVEL_HTTP=warning silences per-request uvicorn access logs, the
+#   same as --uvicorn-log-level warning in the sibling vLLM entrypoint.
+# - DECODE_LOG_INTERVAL throttles the throughput-stats cadence from SGLang's
+#   default 40 decode steps (~1 line/s) to ~400 steps (~every 8s), close to
+#   vLLM's ~10s stats period.
+LOG_LEVEL="${LOG_LEVEL:-info}"
+LOG_LEVEL_HTTP="${LOG_LEVEL_HTTP:-warning}"
+DECODE_LOG_INTERVAL="${DECODE_LOG_INTERVAL:-400}"
 
 # Vision tower OFF by default (same convention as the sibling vLLM stack):
 # --json-model-override-args is always passed. The default override sets
@@ -141,6 +159,9 @@ exec sglang serve "$MODEL_NAME" \
   --mamba-radix-cache-strategy "$MAMBA_RADIX_CACHE_STRATEGY" \
   --mamba-ssm-dtype "$MAMBA_SSM_DTYPE" \
   --json-model-override-args "$JSON_MODEL_OVERRIDE_ARGS" \
+  --log-level "$LOG_LEVEL" \
+  --log-level-http "$LOG_LEVEL_HTTP" \
+  --decode-log-interval "$DECODE_LOG_INTERVAL" \
   "${SPECULATIVE_ARGS[@]}" \
   "${ALLOW_AUTO_TRUNCATE_ARGS[@]}" \
   "${TRUST_ARGS[@]}" \

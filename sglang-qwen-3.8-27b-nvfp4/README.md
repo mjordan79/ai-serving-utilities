@@ -1,6 +1,6 @@
 # Qwen 27B NVFP4 — SGLang Server
 
-![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Alibaba Cloud](https://img.shields.io/badge/Alibaba%20Cloud-FF6A00?style=for-the-badge&logo=alibabacloud&logoColor=white) ![SGLang](https://img.shields.io/badge/SGLang-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Alibaba Cloud](https://img.shields.io/badge/Alibaba%20Cloud-FF6A00?style=for-the-badge&logo=alibabacloud&logoColor=white) ![Gittensor](https://img.shields.io/badge/Gittensor-1F2937?style=for-the-badge) ![SGLang](https://img.shields.io/badge/SGLang-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 Docker Compose deployment for Qwen 27B NVFP4 on SGLang (OpenAI-compatible API).
 
@@ -158,7 +158,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `MODEL_NAME` | `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` | HuggingFace model name — set in `.env` |
 | `HF_CACHE_VOLUME` | `hf-cache-gittensor` | Named volume for the HF cache |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
-| `MEM_FRACTION_STATIC` | `0.90` | Fraction of usable VRAM (0.0–1.0) |
+| `MEM_FRACTION_STATIC` | `0.85` | Fraction of usable VRAM (0.0–1.0). Deviates from the model card (0.90): 0.85 is the zero-UVM-spill tuning on this WDDM/WSL2 host |
 | `TRUST_REMOTE_CODE` | `true` | Pass `--trust-remote-code` (required by some HF repos) |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
@@ -168,8 +168,8 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 |---|---|---|
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
 | `MAX_RUNNING_REQUESTS` | `2` | Maximum concurrent requests |
-| `CONTEXT_LENGTH` | `262144` | Context length |
-| `CHUNKED_PREFILL_SIZE` | `2048` | Chunked prefill size |
+| `CONTEXT_LENGTH` | `262144` | Context length (architecture ceiling — the effective per-request window is `min(CONTEXT_LENGTH, KV pool)`; the pool is what you can tune via `MEM_FRACTION_STATIC`) |
+| `CHUNKED_PREFILL_SIZE` | `1024` | Chunked prefill size (model card: `2048`; `1024` is the WDDM/WSL2 low-spill tuning) |
 | `MAX_MAMBA_CACHE_SIZE` | `12` | Maximum Mamba cache entries |
 
 ### Mamba (hybrid attention state)
@@ -206,6 +206,14 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
 | `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored — the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `PORT` | `30000` | In-container port (host mapping `1238:30000`) |
+
+### Logging
+
+| Variable | Default | Description |
+|---|---|---|
+| `LOG_LEVEL` | `info` | Logger level (`--log-level`). The periodic `Decode batch … gen throughput` stats lines are INFO — set `warning` only if you do not need them |
+| `LOG_LEVEL_HTTP` | `warning` | HTTP server log level (`--log-level-http`); silences per-request access chatter (parity with the sibling vLLM stack's `--uvicorn-log-level warning`) |
+| `DECODE_LOG_INTERVAL` | `400` | Decode steps between throughput stats lines (SGLang default 40 ≈ 1 line/s; 400 ≈ 1 line every ~8s, close to the vLLM stats cadence) |
 
 ### Runtime & low-level
 
