@@ -5,6 +5,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Europe/Rome
 
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+
+RUN apt update && apt full-upgrade -y && \
+    chmod +x /entrypoint.sh
 
 ENTRYPOINT ["/entrypoint.sh"]
