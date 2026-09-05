@@ -16,9 +16,10 @@ set -euo pipefail
 MODEL_QWEN_DIR="vllm-qwen-3.8-27b-nvfp4"
 MODEL_MUSE_DIR="vllm-muse-glimmer-30b-nvfp4"
 MODEL_SGLANG_DIR="sglang-qwen-3.8-27b-nvfp4"
+MODEL_NEMOTRON_DIR="vllm-nemotron-3.5-30b-a3b-nvfp4"
 
 # Resolve the target model deployment.
-#   $1 = model selector (qwen|muse|sglang), default qwen.
+#   $1 = model selector (qwen|muse|sglang|nemotron), default qwen.
 # Exports:
 #   PROJECT_DIR    — absolute path to the model deployment directory
 #   DIRECT_PORT    — host port published by the model's docker-compose.yml
@@ -28,10 +29,11 @@ resolve_model_target() {
     local selector="${1:-qwen}"
     local model_dir engine
     case "$selector" in
-        qwen)   model_dir="$MODEL_QWEN_DIR";   engine="vllm" ;;
-        muse)   model_dir="$MODEL_MUSE_DIR";   engine="vllm" ;;
-        sglang) model_dir="$MODEL_SGLANG_DIR"; engine="sglang" ;;
-        *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse, sglang." >&2; return 1 ;;
+        qwen)     model_dir="$MODEL_QWEN_DIR";  engine="vllm" ;;
+        muse)     model_dir="$MODEL_MUSE_DIR";  engine="vllm" ;;
+        sglang)   model_dir="$MODEL_SGLANG_DIR"; engine="sglang" ;;
+        nemotron) model_dir="$MODEL_NEMOTRON_DIR"; engine="vllm" ;;
+        *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse, sglang, nemotron." >&2; return 1 ;;
     esac
     local suite_dir
     suite_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

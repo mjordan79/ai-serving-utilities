@@ -3,7 +3,7 @@
 #
 # Usage (invoke via bash — the scripts are stored in git without the exec bit):
 #   bash run.sh                       Run all benchmarks, default model (qwen)
-#   bash run.sh <model>               Run all benchmarks for a model (qwen|muse|sglang)
+#   bash run.sh <model>               Run all benchmarks for a model (qwen|muse|sglang|nemotron)
 #   bash run.sh <model> <test>        Run a single test for a model
 #   bash run.sh <test>                Backward-compatible single test, default model
 #
@@ -22,14 +22,14 @@ RESULTS_DIR="${SCRIPT_DIR}/results"
 source "${SCRIPT_DIR}/lib.sh"
 
 # ── Parse arguments: [model] [test] ─────────────────────────────────────────
-# $1 = model selector (qwen|muse, default qwen). Backward compatibility: if $1
+# $1 = model selector (qwen|muse|sglang|nemotron, default qwen). Backward compatibility: if $1
 # names a test file and $2 is absent, it is treated as the test name with the
 # default model (e.g., `bash run.sh 01_simple_chat`).
 MODEL_SELECTOR="qwen"
 SINGLE_TEST=""
 if [[ -n "${1:-}" ]]; then
     case "$1" in
-        qwen|muse|sglang)
+        qwen|muse|sglang|nemotron)
             MODEL_SELECTOR="$1"
             SINGLE_TEST="${2:-}"
             ;;
@@ -40,7 +40,7 @@ if [[ -n "${1:-}" ]]; then
                 echo "ERROR: Unknown model or test: '${1}'"
                 echo ""
                 echo "Usage: bash run.sh [model] [test]"
-                echo "  model : qwen | muse | sglang (default: qwen)"
+                echo "  model : qwen | muse | sglang | nemotron (default: qwen)"
                 echo "  test  : optional single test, e.g. 01_simple_chat"
                 echo ""
                 echo "Available tests:"

@@ -45,11 +45,10 @@ The model is selected as the first positional argument (default `qwen`):
 |----------|----------------------|-----------|-----------|
 | `qwen` (default) | `vllm-qwen-3.8-27b-nvfp4/` | `vllm-qwen-server` | 1235 |
 | `muse` | `vllm-muse-glimmer-30b-nvfp4/` | `vllm-museglimmer-server` | 1236 |
+| `nemotron` | `vllm-nemotron-3.5-30b-a3b-nvfp4/` | `vllm-nemotron-server` | 1237 |
 | `sglang` | `sglang-qwen-3.8-27b-nvfp4/` | `sglang-qwen-server` | 1238 |
 
-> **Not yet supported:** `nemotron` (`vllm-nemotron-3.5-30b-a3b-nvfp4/`) is not wired into the suite yet. Its selector is planned for a future release; until then the suite covers the three targets above.
-
-The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR` / `MODEL_SGLANG_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
+The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR` / `MODEL_SGLANG_DIR` / `MODEL_NEMOTRON_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
 
 | .env Variable | Auto-Derived | Used For |
 |---------------|--------------|----------|
@@ -80,7 +79,7 @@ cd benchmark
 bash warmup.sh            # default model (qwen)
 bash warmup.sh muse       # target Muse Glimmer (vLLM)
 bash warmup.sh sglang     # target Qwen 3.8 27B (SGLang)
-# bash warmup.sh nemotron # not supported yet (see Target selection)
+bash warmup.sh nemotron   # target Nemotron 3.5 30B A3B (vLLM)
 ```
 
 Auto-detects the selected model's `.env`, recovers the API key via Docker, and sends diverse prompts to pre-compile Triton kernels. **Skip this and your first iteration will be artificially slow.**
@@ -97,9 +96,13 @@ bash run.sh muse
 # All tests, Qwen 3.8 27B on SGLang
 bash run.sh sglang
 
+# All tests, Nemotron 3.5 30B A3B (vLLM)
+bash run.sh nemotron
+
 # Single test for a model
 bash run.sh muse 03_code_generation
 bash run.sh sglang 01_simple_chat
+bash run.sh nemotron 02_long_context
 
 # Backward-compatible: test name only, default model
 bash run.sh 01_simple_chat

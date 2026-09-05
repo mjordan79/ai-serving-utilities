@@ -58,12 +58,12 @@ The shared benchmark suite lives in [`benchmark/`](benchmark/) and is model-agno
 
 ```bash
 cd benchmark
-bash warmup.sh [qwen|muse]          # Triton kernel pre-compilation (required first)
-bash run.sh [qwen|muse] [test]      # benchmark suite (8 tests × 3 iterations)
+bash warmup.sh [qwen|muse|sglang|nemotron]  # Triton kernel pre-compilation (required first)
+bash run.sh [qwen|muse|sglang|nemotron] [test]  # benchmark suite (8 tests × 3 iterations)
 bash compare.sh <results_a> <results_b>
 ```
 
-> The suite is model-agnostic by design, but currently only the `qwen` and `muse` vLLM targets are wired in — the `nemotron` and `sglang` deployments are not yet supported and are planned for a future release.
+> The suite is model-agnostic by design: all four targets (`qwen`, `muse`, `sglang`, `nemotron`) are wired in.
 
 Results land in `benchmark/results/<model_label>/` (gitignored). See the [Benchmark Suite README](benchmark/README.md) for full documentation.
 
