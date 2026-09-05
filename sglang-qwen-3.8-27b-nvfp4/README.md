@@ -4,9 +4,9 @@
 
 Docker Compose deployment for Qwen 27B NVFP4 on SGLang (OpenAI-compatible API).
 
-- **Model** — `RadixArk/Qwen3.8-27B-NVFP4` (NVFP4, Mamba/hybrid attention)
-- **Image** — `lmsysorg/sglang:dev-cu13-qwen38-27b-dflash2` (pinned dev tag, see *Notes*)
-- **Speculative decoding** — EAGLE draft model, **disabled by default**; enable via `ENABLE_MTP=true` in `docker-compose.yml`
+- **Model** — `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (NVFP4, Mamba/hybrid attention)
+- **Image** — `lmsysorg/sglang:nightly-dev-cu13-20260901-07c8f729` (pinned multi-arch snapshot, see *Notes*)
+- **Speculative decoding** — DSpark v2 drafter, enabled by default (set `SPECULATIVE_ALGORITHM=none` for full context)
 
 by Renato Perini (mjordan79)
 
@@ -15,7 +15,7 @@ by Renato Perini (mjordan79)
 - **NVIDIA GPU** with CUDA drivers (tested on Geforce RTX 5090 — 32 GB VRAM)
 - **NVIDIA Container Toolkit** (natively or on WSL) installed (`nvidia-container-toolkit`)
 - **Docker** + **Docker Compose**
-- **HuggingFace token** for `RadixArk/Qwen3.8-27B-NVFP4` (`.env` → `MODEL_NAME`)
+- **HuggingFace token** for `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (`.env` → `MODEL_NAME`)
 
 ### For remote access via HTTPS (optional)
 
@@ -33,8 +33,8 @@ Create a `.env` file in the same directory as `docker-compose.yml`:
 HF_TOKEN=hf_your_token_here
 
 # Model (SGLang)
-MODEL_NAME=RadixArk/Qwen3.8-27B-NVFP4
-HF_CACHE_VOLUME=hf-cache-radixark
+MODEL_NAME=gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090
+HF_CACHE_VOLUME=hf-cache-gittensor
 
 # Reverse proxy (optional)
 LETSENCRYPT_DOMAIN=your-domain.duckdns.org
@@ -42,7 +42,7 @@ LETSENCRYPT_EMAIL=you@example.com
 ```
 
 > The token must **never** be hardcoded in docker-compose or the entrypoint.
-> The cache lives on the named volume `hf-cache-radixark` so it persists across container restarts.
+> The cache lives on the named volume `hf-cache-gittensor` so it persists across container restarts.
 
 For remote HTTPS access, the `LETSENCRYPT_DOMAIN` / `LETSENCRYPT_EMAIL` lines are already in the block above.
 
@@ -127,7 +127,7 @@ curl http://localhost:1238/v1/chat/completions \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "RadixArk/Qwen3.8-27B-NVFP4",
+    "model": "gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090",
     "messages": [
       {"role": "user", "content": "Hello, who are you?"}
     ]
@@ -138,7 +138,7 @@ curl -k https://<your-domain.duckdns.org>/v1/chat/completions \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "RadixArk/Qwen3.8-27B-NVFP4",
+    "model": "gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090",
     "messages": [
       {"role": "user", "content": "Hello, who are you?"}
     ]
@@ -155,10 +155,10 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 | Variable | Default | Description |
 |---|---|---|
-| `MODEL_NAME` | `RadixArk/Qwen3.8-27B-NVFP4` | HuggingFace model name — set in `.env` |
-| `HF_CACHE_VOLUME` | `hf-cache-radixark` | Named volume for the HF cache |
+| `MODEL_NAME` | `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` | HuggingFace model name — set in `.env` |
+| `HF_CACHE_VOLUME` | `hf-cache-gittensor` | Named volume for the HF cache |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
-| `MEM_FRACTION_STATIC` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
+| `MEM_FRACTION_STATIC` | `0.90` | Fraction of usable VRAM (0.0–1.0) |
 | `TRUST_REMOTE_CODE` | `true` | Pass `--trust-remote-code` (required by some HF repos) |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
@@ -167,27 +167,28 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
-| `MAX_RUNNING_REQUESTS` | `1` | Maximum concurrent requests |
-| `CUDA_GRAPH_MAX_BS_DECODE` | `1` | Max batch size for CUDA graph decode |
+| `MAX_RUNNING_REQUESTS` | `2` | Maximum concurrent requests |
+| `CONTEXT_LENGTH` | `262144` | Context length |
+| `CHUNKED_PREFILL_SIZE` | `2048` | Chunked prefill size |
+| `MAX_MAMBA_CACHE_SIZE` | `12` | Maximum Mamba cache entries |
 
 ### Mamba (hybrid attention state)
 
 | Variable | Default | Description |
 |---|---|---|
-| `MAMBA_FULL_MEMORY_RATIO` | `4.59` | Mamba full-memory ratio (model-specific tuning) |
 | `MAMBA_SSM_DTYPE` | `bfloat16` | Mamba SSM data type |
 | `MAMBA_RADIX_CACHE_STRATEGY` | `extra_buffer` | Mamba radix cache strategy |
 
-### Speculative decoding (EAGLE)
+### Speculative decoding (DSpark v2)
 
 | Variable | Default | Description |
 |---|---|---|
-| `ENABLE_MTP` | `false` | **Toggle for speculative decoding.** Set to `true` in `docker-compose.yml` to enable the EAGLE draft flags. Default is off (no speculative decoding). |
-| `SPECULATIVE_NUM_STEPS` | `3` | EAGLE spec-decode steps (only used when `ENABLE_MTP=true`) |
-| `SPECULATIVE_EAGLE_TOPK` | `1` | EAGLE top-k (only used when `ENABLE_MTP=true`) |
-| `SPECULATIVE_NUM_DRAFT_TOKENS` | `4` | EAGLE draft tokens (only used when `ENABLE_MTP=true`) |
+| `SPECULATIVE_ALGORITHM` | `DSPARK` | `DSPARK` for the fastest profile, or `none` for full context |
+| `SPECULATIVE_DRAFT_MODEL_PATH` | `gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4` | DSpark v2 drafter |
+| `SPECULATIVE_DSPARK_BLOCK_SIZE` | `7` | DSpark block size |
+| `SPECULATIVE_DRAFT_MODEL_QUANTIZATION` | `modelopt_fp4` | Drafter quantization (required for the NVFP4 checkpoint) |
 
-> When `ENABLE_MTP=true`, the entrypoint passes `--speculative-algorithm EAGLE`, `--speculative-num-steps`, `--speculative-eagle-topk`, `--speculative-num-draft-tokens`, and `--enable-linear-replayssm-spec` to SGLang. When `false` (default), none of these flags are passed.
+> The default DSpark profile is the fastest model-card configuration (161.7 tok/s). Use `SPECULATIVE_ALGORITHM=none` when the full 262K context window is required.
 
 ### Behavior & features
 
@@ -196,6 +197,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `REASONING_PARSER` | `qwen3` | Parser that splits reasoning content from the response |
 | `TOOL_CALL_PARSER` | `qwen3_coder` | Tool-call response parser |
 | `ALLOW_AUTO_TRUNCATE` | `true` | Pass `--allow-auto-truncate` (auto-truncate over-long prompts) |
+| `JSON_MODEL_OVERRIDE_ARGS` | `{"language_model_only": true}` | JSON string for `--json-model-override-args`. Default disables the vision tower (same convention as the sibling vLLM stack: encoder weights never loaded, VRAM freed for KV cache; multimodal requests rejected). Set `{}` to serve images, or a custom JSON string for other config overrides |
 
 ### API & server
 
@@ -244,13 +246,11 @@ The nginx control set is identical to the sibling vLLM stacks (allowlist, rate l
 
 ## Notes
 
-- **Image (dev tag):** `lmsysorg/sglang:dev-cu13-qwen38-27b-dflash2` is a **non-versioned dev tag** from the SGLang project. It may change or disappear without notice. Before the first `docker compose build`, verify it exists on Docker Hub (`docker pull lmsysorg/sglang:dev-cu13-qwen38-27b-dflash2`). If a stable SGLang release supports this model + Mamba/EAGLE combo, pin that stable tag instead.
-- **`--enable-linear-replayssm-spec`:** this is an exotic flag from the reference command. If the image does not support it, the server will fail at boot with an unknown-flag error — remove it from `SPECULATIVE_ARGS` in `entrypoint.sh` and re-run. (Only relevant when `ENABLE_MTP=true`.)
-- **`--mamba-full-memory-ratio 4.59`:** model-specific tuning value. If you override `MODEL_NAME` with a different checkpoint, re-tune this value.
+- **Image:** `lmsysorg/sglang:nightly-dev-cu13-20260901-07c8f729` is an immutable multi-arch snapshot of SGLang main containing the DSpark NVFP4 fix (PRs #34859 and #35496). It replaces `v0.5.18`, which crashes on the quantized drafter `lm_head`; the similarly named `nightly-cu134` tag is arm64-only and must not be used on this amd64 host.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `sglang-keys` volume at `/root/.sglang-key/.api_key`. Retrieve it with `docker exec sglang-qwen-server cat /root/.sglang-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
-- **MTP (EAGLE speculative decoding):** **disabled by default** (`ENABLE_MTP=false` in the entrypoint). Set `ENABLE_MTP=true` in `docker-compose.yml` to enable the EAGLE draft flags (3 steps, top-k 1, 4 draft tokens, linear-replay SSM spec). The reference command in `docker.txt` uses these exact values.
-- **VRAM:** with `MEM_FRACTION_STATIC=0.94` on 32 GB, consumption is ~30 GB.
-- **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts (named volume `hf-cache-radixark`).
+- **DSpark v2:** enabled by default with the Gittensor drafter. It reaches the model-card profile of 161.7 tok/s on a dedicated 32 GB GPU; with speculation enabled the practical context window is about 165K tokens.
+- **VRAM:** with `MEM_FRACTION_STATIC=0.90` on 32 GB, the main model and approximately 1.4 GB drafter fit in the static budget.
+- **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts (named volume `hf-cache-gittensor`).
 - **Port:** the API is exposed on host port `1238` (mapped from internal port 30000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
 - **Reverse Proxy:** two modes via overlay:
   - **Direct** (default): `docker compose up -d` → API on port `1238` (HTTP, LAN-reachable, Bearer-authenticated)

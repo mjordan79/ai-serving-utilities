@@ -33,6 +33,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MODEL_NAME
+      - TP_SIZE
+      - CONTEXT_LENGTH
+      - CHUNKED_PREFILL_SIZE
       # Pass-through: if set in .env the entrypoint uses this key; if empty the
       # entrypoint generates and persists sk-<uuid> in the sglang-keys volume.
       # (Name kept as VLLM_API_KEY for exact parity with the sibling vLLM stacks.)
@@ -42,28 +45,27 @@ services:
       - MEM_FRACTION_STATIC
       - ATTENTION_BACKEND
       - MAX_RUNNING_REQUESTS
-      - CUDA_GRAPH_MAX_BS_DECODE
+      - MAX_MAMBA_CACHE_SIZE
       - REASONING_PARSER
       - TOOL_CALL_PARSER
-      - MAMBA_FULL_MEMORY_RATIO
       - MAMBA_SSM_DTYPE
       - MAMBA_RADIX_CACHE_STRATEGY
       - ALLOW_AUTO_TRUNCATE
       - TRUST_REMOTE_CODE
-      # --- MTP / speculative decoding (EAGLE) ---
-      # Default is false (no speculative decoding). Set to true to enable the
-      # EAGLE draft flags in the entrypoint. Tuned here (never in .env).
-      - ENABLE_MTP
-      - SPECULATIVE_NUM_STEPS
-      - SPECULATIVE_EAGLE_TOPK
-      - SPECULATIVE_NUM_DRAFT_TOKENS
+      # JSON model-config overrides (--json-model-override-args). Default in the
+      # entrypoint disables the vision tower; set in .env to {} to re-enable it.
+      - JSON_MODEL_OVERRIDE_ARGS
+      # --- DSpark v2 speculative decoding ---
+      - SPECULATIVE_ALGORITHM
+      - SPECULATIVE_DRAFT_MODEL_PATH
+      - SPECULATIVE_DSPARK_BLOCK_SIZE
+      - SPECULATIVE_DRAFT_MODEL_QUANTIZATION
       - PORT
       # --- HuggingFace ---
       - HF_TOKEN
 
     volumes:
-      # Default fallback = RadixArk cache (matches documented default variant).
-      - ${HF_CACHE_VOLUME:-hf-cache-radixark}:/root/.cache/huggingface
+      - ${HF_CACHE_VOLUME:-hf-cache-gittensor}:/root/.cache/huggingface
       - sglang-keys:/root/.sglang-key
 
     ports:
@@ -78,7 +80,7 @@ networks:
 volumes:
   # Explicit names = deterministic volumes (the project name is pinned above),
   # so state survives even if the folder or compose file moves.
-  hf-cache-radixark:
-    name: sglang-qwen-38-27b-nvfp4_hf-cache-radixark
+  hf-cache-gittensor:
+    name: sglang-qwen-38-27b-nvfp4_hf-cache-gittensor
   sglang-keys:
     name: sglang-qwen-38-27b-nvfp4_sglang-keys

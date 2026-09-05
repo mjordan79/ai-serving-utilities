@@ -14,7 +14,7 @@ by Renato Perini (mjordan79)
 |-------|----------|-----------|-----------|---------|-------------|
 | Qwen 3.8 — 27B NVFP4 | Alibaba | Unsloth | [`vllm-qwen-3.8-27b-nvfp4/`](vllm-qwen-3.8-27b-nvfp4/) | [unsloth/Qwen3.8-27B-NVFP4](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) | `unsloth/Qwen3.8-27B-NVFP4` on vLLM (Compressed-Tensors) |
 | Qwen 3.6 — 27B NVFP4 | Alibaba | NVIDIA | [`vllm-qwen-3.8-27b-nvfp4/`](vllm-qwen-3.8-27b-nvfp4/) | [nvidia/Qwen3.6-27B-NVFP4](https://huggingface.co/nvidia/Qwen3.6-27B-NVFP4) | `nvidia/Qwen3.6-27B-NVFP4` on vLLM (ModelOpt) |
-| Qwen 3.8 — 27B NVFP4 (SGLang) | Alibaba | RadixArk | [`sglang-qwen-3.8-27b-nvfp4/`](sglang-qwen-3.8-27b-nvfp4/) | [RadixArk/Qwen3.8-27B-NVFP4](https://huggingface.co/RadixArk/Qwen3.8-27B-NVFP4) | `RadixArk/Qwen3.8-27B-NVFP4` on SGLang (NVFP4, Mamba/hybrid attention) |
+| Qwen 3.8 — 27B NVFP4 (SGLang) | Alibaba | Gittensor | [`sglang-qwen-3.8-27b-nvfp4/`](sglang-qwen-3.8-27b-nvfp4/) | [gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090](https://huggingface.co/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090) | `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` on SGLang (DSpark v2, NVFP4) |
 | Muse Glimmer 30B — NVFP4 | Meta | RedHatAI | [`vllm-muse-glimmer-30b-nvfp4/`](vllm-muse-glimmer-30b-nvfp4/) | [RedHatAI/Muse-Glimmer-30B-NVFP4](https://huggingface.co/RedHatAI/Muse-Glimmer-30B-NVFP4) | `RedHatAI/Muse-Glimmer-30B-NVFP4` on vLLM (Compressed-Tensors) |
 | Nemotron 3.5 Lightning — 30B A3B NVFP4 | NVIDIA | NVIDIA | [`vllm-nemotron-3.5-30b-a3b-nvfp4/`](vllm-nemotron-3.5-30b-a3b-nvfp4/) | [nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4](https://huggingface.co/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4) | Hybrid Mamba-MoE (30B total / 3B active) on vLLM (ModelOpt NVFP4 W4A16) |
 

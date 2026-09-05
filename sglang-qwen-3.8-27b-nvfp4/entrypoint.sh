@@ -61,18 +61,20 @@ fi
 # --- Build SGLang arguments from environment variables ---
 # Every flag has a default here; override through the container environment to change.
 
-# Model
-MODEL_NAME="${MODEL_NAME:-RadixArk/Qwen3.8-27B-NVFP4}"
+# Model card defaults: Gittensor Qwen3.8 with DSpark v2.
+MODEL_NAME="${MODEL_NAME:-gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090}"
+TP_SIZE="${TP_SIZE:-1}"
+CONTEXT_LENGTH="${CONTEXT_LENGTH:-262144}"
+CHUNKED_PREFILL_SIZE="${CHUNKED_PREFILL_SIZE:-2048}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
-MEM_FRACTION_STATIC="${MEM_FRACTION_STATIC:-0.94}"
+MEM_FRACTION_STATIC="${MEM_FRACTION_STATIC:-0.90}"
 ATTENTION_BACKEND="${ATTENTION_BACKEND:-flashinfer}"
-MAX_RUNNING_REQUESTS="${MAX_RUNNING_REQUESTS:-1}"
-CUDA_GRAPH_MAX_BS_DECODE="${CUDA_GRAPH_MAX_BS_DECODE:-1}"
+MAX_RUNNING_REQUESTS="${MAX_RUNNING_REQUESTS:-2}"
+MAX_MAMBA_CACHE_SIZE="${MAX_MAMBA_CACHE_SIZE:-12}"
 
 # Mamba (hybrid attention state)
-MAMBA_FULL_MEMORY_RATIO="${MAMBA_FULL_MEMORY_RATIO:-4.59}"
 MAMBA_SSM_DTYPE="${MAMBA_SSM_DTYPE:-bfloat16}"
-MAMBA_RADIX_CACHE_STRATEGY="${MAMBA_RADIX_CACHE_STRATEGY:-extra_buffer}"
+MAMBA_RADIX_CACHE_STRATEGY="${MAMBA_RADIX_CACHE_STRATEGY:-extra_buffer_lazy}"
 
 # Parsers
 REASONING_PARSER="${REASONING_PARSER:-qwen3}"
@@ -82,27 +84,36 @@ TOOL_CALL_PARSER="${TOOL_CALL_PARSER:-qwen3_coder}"
 ALLOW_AUTO_TRUNCATE="${ALLOW_AUTO_TRUNCATE:-true}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
 
-# Speculative decoding (EAGLE) — OFF by default.
-# Enable by setting ENABLE_MTP=true in docker-compose.yml; the flags below
-# are then passed through to SGLang.
-ENABLE_MTP="${ENABLE_MTP:-false}"
-SPECULATIVE_NUM_STEPS="${SPECULATIVE_NUM_STEPS:-3}"
-SPECULATIVE_EAGLE_TOPK="${SPECULATIVE_EAGLE_TOPK:-1}"
-SPECULATIVE_NUM_DRAFT_TOKENS="${SPECULATIVE_NUM_DRAFT_TOKENS:-4}"
+# Vision tower OFF by default (same convention as the sibling vLLM stack):
+# --json-model-override-args is always passed. The default override sets
+# language_model_only=true so the engine skips the vision encoder (its
+# weights are never loaded, freeing VRAM for the KV cache; multimodal
+# requests are rejected). To serve images again, set
+# JSON_MODEL_OVERRIDE_ARGS={} in .env (or any custom JSON string).
+DEFAULT_JSON_MODEL_OVERRIDE='{"language_model_only": true}'
+JSON_MODEL_OVERRIDE_ARGS="${JSON_MODEL_OVERRIDE_ARGS:-$DEFAULT_JSON_MODEL_OVERRIDE}"
+
+# Speculative decoding: DSpark v2 is the fastest model-card profile.
+SPECULATIVE_ALGORITHM="${SPECULATIVE_ALGORITHM:-DSPARK}"
+SPECULATIVE_DRAFT_MODEL_PATH="${SPECULATIVE_DRAFT_MODEL_PATH:-gittensor-model-hub/Qwen3.8-27B-DSpark-NVFP4}"
+SPECULATIVE_DSPARK_BLOCK_SIZE="${SPECULATIVE_DSPARK_BLOCK_SIZE:-7}"
+SPECULATIVE_DRAFT_MODEL_QUANTIZATION="${SPECULATIVE_DRAFT_MODEL_QUANTIZATION:-modelopt_fp4}"
 
 # API
 PORT="${PORT:-30000}"
 
 # --- Conditional arguments ---
 SPECULATIVE_ARGS=()
-if [ "$ENABLE_MTP" = "true" ]; then
+if [ "$SPECULATIVE_ALGORITHM" = "DSPARK" ]; then
   SPECULATIVE_ARGS=(
-    --speculative-algorithm EAGLE
-    --speculative-num-steps "$SPECULATIVE_NUM_STEPS"
-    --speculative-eagle-topk "$SPECULATIVE_EAGLE_TOPK"
-    --speculative-num-draft-tokens "$SPECULATIVE_NUM_DRAFT_TOKENS"
-    --enable-linear-replayssm-spec
+    --speculative-algorithm DSPARK
+    --speculative-draft-model-path "$SPECULATIVE_DRAFT_MODEL_PATH"
+    --speculative-dspark-block-size "$SPECULATIVE_DSPARK_BLOCK_SIZE"
+    --speculative-draft-model-quantization "$SPECULATIVE_DRAFT_MODEL_QUANTIZATION"
   )
+elif [ "$SPECULATIVE_ALGORITHM" != "none" ]; then
+  echo "ERROR: SPECULATIVE_ALGORITHM must be DSPARK or none." >&2
+  exit 1
 fi
 
 ALLOW_AUTO_TRUNCATE_ARGS=()
@@ -117,16 +128,19 @@ fi
 
 exec sglang serve "$MODEL_NAME" \
   "${API_KEY_ARGS[@]}" \
+  --tp-size "$TP_SIZE" \
+  --context-length "$CONTEXT_LENGTH" \
+  --chunked-prefill-size "$CHUNKED_PREFILL_SIZE" \
   --kv-cache-dtype "$KV_CACHE_DTYPE" \
   --mem-fraction-static "$MEM_FRACTION_STATIC" \
   --attention-backend "$ATTENTION_BACKEND" \
   --max-running-requests "$MAX_RUNNING_REQUESTS" \
-  --cuda-graph-max-bs-decode "$CUDA_GRAPH_MAX_BS_DECODE" \
+  --max-mamba-cache-size "$MAX_MAMBA_CACHE_SIZE" \
   --reasoning-parser "$REASONING_PARSER" \
   --tool-call-parser "$TOOL_CALL_PARSER" \
-  --mamba-full-memory-ratio "$MAMBA_FULL_MEMORY_RATIO" \
   --mamba-radix-cache-strategy "$MAMBA_RADIX_CACHE_STRATEGY" \
   --mamba-ssm-dtype "$MAMBA_SSM_DTYPE" \
+  --json-model-override-args "$JSON_MODEL_OVERRIDE_ARGS" \
   "${SPECULATIVE_ARGS[@]}" \
   "${ALLOW_AUTO_TRUNCATE_ARGS[@]}" \
   "${TRUST_ARGS[@]}" \
