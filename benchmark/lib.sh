@@ -15,20 +15,23 @@ set -euo pipefail
 # directory only requires updating this table.
 MODEL_QWEN_DIR="vllm-qwen-3.8-27b-nvfp4"
 MODEL_MUSE_DIR="vllm-muse-glimmer-30b-nvfp4"
+MODEL_SGLANG_DIR="sglang-qwen-3.8-27b-nvfp4"
 
 # Resolve the target model deployment.
-#   $1 = model selector (qwen|muse), default qwen.
+#   $1 = model selector (qwen|muse|sglang), default qwen.
 # Exports:
 #   PROJECT_DIR    — absolute path to the model deployment directory
 #   DIRECT_PORT    — host port published by the model's docker-compose.yml
 #   CONTAINER_NAME — container_name from the model's docker-compose.yml
+#   MODEL_ENGINE   — inference engine of the deployment (vllm|sglang)
 resolve_model_target() {
     local selector="${1:-qwen}"
-    local model_dir
+    local model_dir engine
     case "$selector" in
-        qwen) model_dir="$MODEL_QWEN_DIR" ;;
-        muse) model_dir="$MODEL_MUSE_DIR" ;;
-        *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse." >&2; return 1 ;;
+        qwen)   model_dir="$MODEL_QWEN_DIR";   engine="vllm" ;;
+        muse)   model_dir="$MODEL_MUSE_DIR";   engine="vllm" ;;
+        sglang) model_dir="$MODEL_SGLANG_DIR"; engine="sglang" ;;
+        *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse, sglang." >&2; return 1 ;;
     esac
     local suite_dir
     suite_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -36,14 +39,16 @@ resolve_model_target() {
     [[ -d "$PROJECT_DIR" ]] || { echo "ERROR: Model directory not found: ${PROJECT_DIR}" >&2; return 1; }
     local compose="${PROJECT_DIR}/docker-compose.yml"
     [[ -f "$compose" ]] || { echo "ERROR: Compose file not found: ${compose}" >&2; return 1; }
-    # First published port mapping "<host>:8000" (vLLM listens on 8000 inside).
-    DIRECT_PORT=$(grep -oE '"[0-9]+:8000"' "$compose" | head -1 | tr -d '"' | cut -d: -f1 || true)
-    [[ -n "$DIRECT_PORT" ]] || { echo "ERROR: No published port <host>:8000 found in ${compose}" >&2; return 1; }
+    # First published port mapping "<host>:<container>" (vLLM listens on 8000,
+    # SGLang on 30000). Each compose file publishes exactly one mapping.
+    DIRECT_PORT=$(grep -oE '"[0-9]+:[0-9]+"' "$compose" | head -1 | tr -d '"' | cut -d: -f1 || true)
+    [[ -n "$DIRECT_PORT" ]] || { echo "ERROR: No published port mapping found in ${compose}" >&2; return 1; }
     CONTAINER_NAME=$(grep -E '^[[:space:]]*container_name:' "$compose" | head -1 \
         | sed 's/.*container_name:[[:space:]]*//' | tr -d '"\r' || true)
     [[ -n "$CONTAINER_NAME" ]] || { echo "ERROR: No container_name found in ${compose}" >&2; return 1; }
-    export PROJECT_DIR DIRECT_PORT CONTAINER_NAME
-    echo "INFO: Target model '${selector}' → ${PROJECT_DIR} (port ${DIRECT_PORT}, container ${CONTAINER_NAME})" >&2
+    MODEL_ENGINE="$engine"
+    export PROJECT_DIR DIRECT_PORT CONTAINER_NAME MODEL_ENGINE
+    echo "INFO: Target model '${selector}' → ${PROJECT_DIR} (port ${DIRECT_PORT}, container ${CONTAINER_NAME}, engine ${engine})" >&2
 }
 
 # Trim leading/trailing whitespace (pure bash — no xargs, no subshell).
@@ -87,27 +92,36 @@ resolve_base_url() {
     export BASE_URL
 }
 
-# Recover the vLLM API key. Resolution order:
+# Recover the inference-engine API key (vLLM or SGLang). Resolution order:
 #   1. Live from the running container (docker exec → docker compose exec).
-#   2. VLLM_API_KEY from the project .env (fixed-key convention).
+#   2. VLLM_API_KEY from the project .env (fixed-key convention; both
+#      deployments read the same .env variable).
 #   3. No-auth probe: if the server answers /v1/models without credentials,
 #      authentication is disabled and an empty key is a valid state.
 #   4. Interactive prompt as last resort.
+# The key file path and the compose service name are engine-specific:
+#   vllm   → /root/.vllm-key/.api_key,  service "vllm"
+#   sglang → /root/.sglang-key/.api_key, service "sglang"
 # NOTE: docker output is captured via a temp file, not command substitution —
 # under WSL interop (docker.exe), substitution/pipe capture can come back empty
 # while file redirect works reliably.
 recover_api_key() {
     API_KEY=""
     local probe_code=""
+    local key_file compose_service
+    case "${MODEL_ENGINE:-vllm}" in
+        sglang) key_file="/root/.sglang-key/.api_key"; compose_service="sglang" ;;
+        *)      key_file="/root/.vllm-key/.api_key";  compose_service="vllm" ;;
+    esac
     if command -v docker >/dev/null 2>&1; then
         local keyfile
-        keyfile=$(mktemp 2>/dev/null || printf '/tmp/vllm_key_%s' "$$")
-        docker exec "${CONTAINER_NAME}" cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+        keyfile=$(mktemp 2>/dev/null || printf '/tmp/eng_key_%s' "$$")
+        docker exec "${CONTAINER_NAME}" cat "$key_file" > "$keyfile" 2>/dev/null \
             && API_KEY=$(<"$keyfile")
         if [[ -z "$API_KEY" ]]; then
-            # Fallback: docker compose (service name via compose file)
+            # Fallback: docker compose (engine-specific service name)
             docker compose -f "${PROJECT_DIR}/docker-compose.yml" \
-                exec -T vllm cat /root/.vllm-key/.api_key > "$keyfile" 2>/dev/null \
+                exec -T "$compose_service" cat "$key_file" > "$keyfile" 2>/dev/null \
                 && API_KEY=$(<"$keyfile")
         fi
         rm -f "$keyfile"
@@ -269,6 +283,134 @@ declare -g METRIC_GEN_TOKENS=0
 declare -g METRIC_TPS="0.0"
 declare -g METRIC_RAW_JSON=""
 
+# ── SGLang variant: streaming SSE with include_usage ────────────────────────
+# SGLang omits the vLLM `metrics.time_to_first_token_ms` block, so the
+# non-streaming TTFT trick used by the vLLM path would degenerate to Total.
+# Instead we keep the request streaming and ask for a trailing usage chunk
+# (stream_options.include_usage):
+#   • TTFT  = first chunk carrying a non-empty content / reasoning_content /
+#             reasoning delta (wall clock),
+#   • tokens = extracted from the final usage chunk (empty choices, then
+#             `data: [DONE]`).
+# Sets the same METRIC_* globals as the vLLM path, so tests stay model-agnostic.
+run_chat_stream_sglang() {
+    local payload="$1"
+
+    # Ensure streaming is on (tests already send "stream":true; flip any
+    # "stream":false) and request the trailing usage chunk. The payload is a
+    # flat JSON object, so the last `}` is the top-level close: drop it,
+    # append the option, close again. Order-independent and payload-safe.
+    local sgl_payload
+    sgl_payload=$(printf '%s' "$payload" | sed 's/"stream":false/"stream":true/')
+    sgl_payload="${sgl_payload%?},"'"stream_options":{"include_usage":true}}'
+
+    local start_ns end_ns first="" usage="" rc=0
+    start_ns=$(now_ns)
+    local fifo codefile errfile
+    fifo=$(mktemp -u)
+    codefile=$(mktemp)
+    errfile=$(mktemp)
+    rm -f "$fifo"
+    mkfifo "$fifo" || { echo "ERROR: mkfifo failed for ${fifo}" >&2; return 1; }
+
+    # Stream the SSE body to the FIFO; the reader loop below timestamps the
+    # first content-bearing chunk while consuming it. The URL MUST be present:
+    # curl with no URL dies before opening the FIFO, and the reader would
+    # block forever on the FIFO open (a deadlock, not a curl timeout).
+    curl -sS -k --max-time "${CURL_TIMEOUT:-600}" -N \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer ${API_KEY}" \
+        -d "$sgl_payload" \
+        -o "$fifo" -w '%{http_code}' > "$codefile" 2> "$errfile" \
+        "${BASE_URL}/v1/chat/completions" &
+    local curl_pid=$!
+
+    local line d
+    while IFS= read -r line; do
+        case "$line" in
+            "data:"*) d="${line#data:}"; d="${d# }" ;;
+            "data"*)  d="${line#data}";  d="${d# }" ;;
+            *) continue ;;
+        esac
+        [[ -z "$d" || "$d" == "[DONE]" ]] && continue
+        # The trailing usage chunk is the only one carrying prompt_tokens.
+        case "$d" in
+            *"prompt_tokens"*) usage="$d" ;;
+        esac
+        # First non-empty token = TTFT. Thinking models emit reasoning_content
+        # before content; plain models emit content. `if` guards keep this
+        # safe under `set -e` (a short-circuited `a && b` can trip errexit).
+        if [[ -z "$first" ]]; then
+            # First generated token = the first chunk carrying a non-empty
+            # content field. SGLang thinking models stream reasoning_content
+            # before content, so accept either. Patterns are "contains"
+            # globs (*...*) — the JSON value follows the key, so an
+            # ends-with glob can never match. Negatives exclude the "" and
+            # null forms, which carry no token.
+            if [[ "$d" == *'"content":"'* ]] \
+               && [[ "$d" != *'"content":""'* ]] \
+               && [[ "$d" != *'"content":null'* ]]; then
+                first=$(now_ns)
+            elif [[ "$d" == *'"reasoning_content":"'* ]] \
+                 && [[ "$d" != *'"reasoning_content":""'* ]] \
+                 && [[ "$d" != *'"reasoning_content":null'* ]]; then
+                first=$(now_ns)
+            elif [[ "$d" == *'"reasoning":"'* ]] \
+                 && [[ "$d" != *'"reasoning":""'* ]] \
+                 && [[ "$d" != *'"reasoning":null'* ]]; then
+                first=$(now_ns)
+            fi
+        fi
+    done < "$fifo"
+
+    wait "$curl_pid" 2>/dev/null || rc=$?
+    rm -f "$fifo"
+
+    end_ns=$(now_ns)
+    local status
+    status=$(cat "$codefile" 2>/dev/null || echo "")
+    rm -f "$codefile"
+
+    if [[ $rc -ne 0 || "${status:-000}" != "200" ]]; then
+        local error_msg
+        error_msg=$(head -c 300 "$errfile" 2>/dev/null || true)
+        echo "ERROR: HTTP ${status:-curl-failed} (rc=$rc): ${error_msg}" >&2
+        rm -f "$errfile"
+        return 1
+    fi
+    rm -f "$errfile"
+
+    METRIC_TOTAL_MS=$(( (end_ns - start_ns) / 1000000 ))
+
+    METRIC_TTFT_MS=0
+    if [[ -n "$first" ]]; then
+        METRIC_TTFT_MS=$(( (first - start_ns) / 1000000 ))
+    fi
+    # Fallback (matches the vLLM convention): if no content chunk was observed
+    # (e.g. an empty generation), report wall-clock total rather than 0.
+    if [[ $METRIC_TTFT_MS -eq 0 ]]; then
+        METRIC_TTFT_MS=$METRIC_TOTAL_MS
+    fi
+
+    if [[ -n "$usage" ]]; then
+        local up uc
+        up=$(json_get_value "$usage" "prompt_tokens")
+        uc=$(json_get_value "$usage" "completion_tokens")
+        if [[ -n "$up" ]]; then
+            METRIC_PROMPT_TOKENS=$up
+            METRIC_INPUT_TOKENS=$up
+        fi
+        if [[ -n "$uc" ]]; then
+            METRIC_GEN_TOKENS=$uc
+            METRIC_OUTPUT_TOKENS=$uc
+        fi
+    fi
+
+    if [[ $METRIC_TOTAL_MS -gt 0 ]]; then
+        METRIC_TPS=$(awk "BEGIN { printf \"%.2f\", ${METRIC_OUTPUT_TOKENS} / (${METRIC_TOTAL_MS} / 1000.0) }")
+    fi
+}
+
 run_chat_stream() {
     local payload="$1"
 
@@ -280,6 +422,13 @@ run_chat_stream() {
     METRIC_GEN_TOKENS=0
     METRIC_TPS="0.0"
     METRIC_RAW_JSON=""
+
+    # Engine-aware dispatch: SGLang has no metrics.time_to_first_token_ms, so
+    # the vLLM non-streaming trick is not usable there.
+    if [[ "${MODEL_ENGINE:-vllm}" == "sglang" ]]; then
+        run_chat_stream_sglang "$payload"
+        return
+    fi
 
     # Force non-streaming mode for accurate token counts
     # vLLM v0.27.1 does not send usage in SSE chunks

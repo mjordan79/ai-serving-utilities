@@ -8,7 +8,7 @@
 #
 # Usage (invoke via bash — the scripts are stored in git without the exec bit):
 #   bash warmup.sh              Warmup default model (qwen)
-#   bash warmup.sh <model>      Warmup a specific model (qwen|muse)
+#   bash warmup.sh <model>      Warmup a specific model (qwen|muse|sglang)
 #
 # Auto-detects config from the selected model's .env and docker-compose.yml.
 
@@ -22,9 +22,9 @@ source "${SCRIPT_DIR}/lib.sh"
 
 MODEL_SELECTOR="${1:-qwen}"
 case "$MODEL_SELECTOR" in
-    qwen|muse) ;;
+    qwen|muse|sglang) ;;
     *)
-        echo "ERROR: Unknown model '${MODEL_SELECTOR}'. Valid models: qwen, muse."
+        echo "ERROR: Unknown model '${MODEL_SELECTOR}'. Valid models: qwen, muse, sglang."
         exit 1
         ;;
 esac

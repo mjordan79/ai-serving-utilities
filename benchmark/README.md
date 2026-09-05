@@ -45,10 +45,11 @@ The model is selected as the first positional argument (default `qwen`):
 |----------|----------------------|-----------|-----------|
 | `qwen` (default) | `vllm-qwen-3.8-27b-nvfp4/` | `vllm-qwen-server` | 1235 |
 | `muse` | `vllm-muse-glimmer-30b-nvfp4/` | `vllm-museglimmer-server` | 1236 |
+| `sglang` | `sglang-qwen-3.8-27b-nvfp4/` | `sglang-qwen-server` | 1238 |
 
-> **Not yet supported:** `nemotron` (`vllm-nemotron-3.5-30b-a3b-nvfp4/`) and `sglang` (`sglang-qwen-3.8-27b-nvfp4/`) are not wired into the suite yet. Their selectors are planned for a future release; until then the suite covers only the two vLLM targets above.
+> **Not yet supported:** `nemotron` (`vllm-nemotron-3.5-30b-a3b-nvfp4/`) is not wired into the suite yet. Its selector is planned for a future release; until then the suite covers the three targets above.
 
-The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
+The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR` / `MODEL_SGLANG_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
 
 | .env Variable | Auto-Derived | Used For |
 |---------------|--------------|----------|
@@ -77,9 +78,9 @@ No `jq` required — all JSON parsing is handled via `gawk`/`sed`.
 ```bash
 cd benchmark
 bash warmup.sh            # default model (qwen)
-bash warmup.sh muse       # target Muse Glimmer
+bash warmup.sh muse       # target Muse Glimmer (vLLM)
+bash warmup.sh sglang     # target Qwen 3.8 27B (SGLang)
 # bash warmup.sh nemotron # not supported yet (see Target selection)
-# bash warmup.sh sglang   # not supported yet (see Target selection)
 ```
 
 Auto-detects the selected model's `.env`, recovers the API key via Docker, and sends diverse prompts to pre-compile Triton kernels. **Skip this and your first iteration will be artificially slow.**
@@ -90,11 +91,15 @@ Auto-detects the selected model's `.env`, recovers the API key via Docker, and s
 # All tests, default model (qwen)
 bash run.sh
 
-# All tests, Muse Glimmer
+# All tests, Muse Glimmer (vLLM)
 bash run.sh muse
+
+# All tests, Qwen 3.8 27B on SGLang
+bash run.sh sglang
 
 # Single test for a model
 bash run.sh muse 03_code_generation
+bash run.sh sglang 01_simple_chat
 
 # Backward-compatible: test name only, default model
 bash run.sh 01_simple_chat
@@ -155,6 +160,23 @@ simple_chat    3    15    51    241    1820    28.02
 - **TTFT from metrics**: Non-streaming responses include `metrics.time_to_first_token_ms` for accurate TTFT measurement.
 - **Reasoning/Thinking**: Model uses `"reasoning"` field during thinking phase, `"content"` for final response. `json_get_delta_content()` handles both.
 - **Health endpoint**: `/health` returns HTTP 200 with **empty body** (no JSON). Use `/v1/models` for model verification (requires auth).
+
+### SGLang Specifics (selector `sglang`)
+
+The SGLang deployment exposes the same OpenAI-compatible API but differs in two
+ways that the suite handles automatically in `lib.sh` (`run_chat_stream`):
+
+- **No `metrics` block in non-streaming responses**: SGLang does not report
+  `metrics.time_to_first_token_ms`, so wall-clock TTFT would degenerate to
+  Total. Instead of forcing `stream=false`, the SGLang branch keeps the
+  streaming request and adds `stream_options: {"include_usage": true}`:
+  token counts come from the trailing usage chunk (empty `choices`, then
+  `data: [DONE]`), and TTFT is measured as the first chunk carrying a
+  non-empty `content` / `reasoning_content` / `reasoning` delta.
+- **API key location**: the SGLang stack persists the key at
+  `/root/.sglang-key/.api_key` (compose service `sglang`), vs
+  `/root/.vllm-key/.api_key` (service `vllm`). `recover_api_key` picks the
+  path per engine; the `.env` fallback (`VLLM_API_KEY`) is shared by both.
 
 ### JSON Parsing (No jq)
 
