@@ -16,7 +16,7 @@ for i in $(seq 1 40); do
 done
 
 escaped_ctx=$(json_escape "$long_context")
-payload=$(printf '{"model":"%s","stream":true,"temperature":0.3,"max_tokens":128,"messages":[{"role":"user","content":"Given the following document, provide a brief summary in 3 bullet points:\\n\\n%s"}]}' "${MODEL_NAME:-auto}" "$escaped_ctx")
+payload=$(printf '{"model":"%s","stream":true,"temperature":0.3,"max_tokens":128,"messages":[{"role":"user","content":"Given the following document, provide a brief summary in 3 bullet points:\\n\\n%s"}]}' "${SERVED_MODEL_NAME:-auto}" "$escaped_ctx")
 
 echo "▶ ${TEST_NAME}: Long prefill (~4000 input tokens), short answer"
 

@@ -192,14 +192,14 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ### Optional: vLLM-Copilot budget
 
-vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: they keep the Output Length picker and the input window inside the ~103.9K KV pool (worst case `65536 + 32768 = 98.3K`), so the client neither 400s the request nor triggers a silent `--allow-auto-truncate` prompt cut.
+vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: they keep the Output Length picker and the input window inside the ~103.9K KV pool (worst case `67584 + 32768 = 100.4K`), so the client neither 400s the request nor triggers a silent `--allow-auto-truncate` prompt cut.
 
 Recommended model entry (`sglang/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090`):
 
 | Parameter | Value | Rationale |
 |---|---|---|
-| `maxOutputTokens` | `[32768, 16384, 8192]` (array — Output Length picker, first value = default) | Effective per-request window is the KV pool (~103.9K tokens at `MEM_FRACTION_STATIC=0.85` on the WDDM/WSL2 target platform), not the 262K architecture ceiling. Default pick 32768 keeps the worst case `65536 + 32768 = 98.3K < 103.9K`. A 65536 pick would leave only ~38K input headroom: agent prompts (~30K) plus multi-turn history exceed it, and `--allow-auto-truncate` then **silently truncates the prompt** — losing context with no error. |
-| `maxInputTokens` | `65536` | Pinned (not auto-computed, which would be `pool − 32768 = 71.1K`): `65536 + 32768 = 98.3K` stays under the pool with ~5K slack. |
+| `maxOutputTokens` | `[32768, 16384, 8192]` (array — Output Length picker, first value = default) | Effective per-request window is the KV pool (~103.9K tokens at `MEM_FRACTION_STATIC=0.85` on the WDDM/WSL2 target platform), not the 262K architecture ceiling. Default pick 32768 keeps the worst case `67584 + 32768 = 100.4K < 103.9K`. A 65536 pick would leave only ~38K input headroom: agent prompts (~30K) plus multi-turn history exceed it, and `--allow-auto-truncate` then **silently truncates the prompt** — losing context with no error. |
+| `maxInputTokens` | `67584` | Pinned below the auto-computed `pool − 32768 = 71.1K`: `67584 + 32768 = 100.4K` stays under the pool with ~3.5K slack. |
 
 **Trade-off:** omitting the 65536 pick removes one-shot very long generation. To get it back, raise `MEM_FRACTION_STATIC` to 0.90 — on the WDDM/WSL2 target platform 0.90 causes UVM spill, 0.85 avoids it — or accept that a second concurrent request waits for KV release.
 

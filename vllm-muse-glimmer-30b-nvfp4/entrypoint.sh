@@ -72,6 +72,8 @@ export VLLM_MAX_N_SEQUENCES
 
 # Model
 MODEL_NAME="${MODEL_NAME:-RedHatAI/Muse-Glimmer-30B-NVFP4}"
+# Name exposed via /v1/models.
+SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-vllm/redhatai/museglimmer-30b-nvfp4}"
 DTYPE="${DTYPE:-auto}"
 TP_SIZE="${TP_SIZE:-1}"
 
@@ -171,6 +173,7 @@ if [ "$TRUST_REMOTE_CODE" = "true" ]; then
 fi
 
 exec vllm serve "$MODEL_NAME" \
+  --served-model-name "$SERVED_MODEL_NAME" \
   "${API_KEY_ARGS[@]}" \
   --dtype "$DTYPE" \
   --safetensors-load-strategy "$SAFETENSORS_LOAD_STRATEGY" \

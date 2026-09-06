@@ -68,6 +68,8 @@ fi
 # WDDM/WSL2 host the card values overcommitted VRAM (UVM spill), 0.85 is the
 # zero-spill tuning.
 MODEL_NAME="${MODEL_NAME:-gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090}"
+# Name exposed via /v1/models.
+SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-sglang/gittensor/qwen3.8-27b-nvfp4-rtx5090}"
 TP_SIZE="${TP_SIZE:-1}"
 CONTEXT_LENGTH="${CONTEXT_LENGTH:-262144}"
 CHUNKED_PREFILL_SIZE="${CHUNKED_PREFILL_SIZE:-1024}"
@@ -145,6 +147,7 @@ if [ "$TRUST_REMOTE_CODE" = "true" ]; then
 fi
 
 exec sglang serve "$MODEL_NAME" \
+  --served-model-name "$SERVED_MODEL_NAME" \
   "${API_KEY_ARGS[@]}" \
   --tp-size "$TP_SIZE" \
   --context-length "$CONTEXT_LENGTH" \

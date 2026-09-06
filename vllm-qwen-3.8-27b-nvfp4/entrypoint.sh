@@ -72,6 +72,9 @@ export VLLM_MAX_N_SEQUENCES
 
 # Model
 MODEL_NAME="${MODEL_NAME:-unsloth/Qwen3-8-27B-NVFP4}"
+# Name exposed via /v1/models. Follows the unsloth default; when switching to
+# the nvidia variant in .env, override SERVED_MODEL_NAME there as well.
+SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-vllm/unsloth/qwen3.8-27b-nvfp4}"
 DTYPE="${DTYPE:-auto}"
 TP_SIZE="${TP_SIZE:-1}"
 
@@ -175,6 +178,7 @@ fi
 CHAT_TEMPLATE_KWARGS='{"enable_thinking": '"$DEFAULT_ENABLE_THINKING"', "preserve_thinking": '"$DEFAULT_PRESERVE_THINKING"'}'
 
 exec vllm serve "$MODEL_NAME" \
+  --served-model-name "$SERVED_MODEL_NAME" \
   "${API_KEY_ARGS[@]}" \
   --dtype "$DTYPE" \
   --safetensors-load-strategy "$SAFETENSORS_LOAD_STRATEGY" \

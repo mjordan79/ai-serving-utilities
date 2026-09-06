@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/../lib.sh"
 
 TEST_NAME="simple_chat"
 
-payload=$(printf '{"model":"%s","stream":true,"temperature":0.7,"max_tokens":256,"messages":[{"role":"user","content":"What is the capital of France and what is its population?"}]}' "${MODEL_NAME:-auto}")
+payload=$(printf '{"model":"%s","stream":true,"temperature":0.7,"max_tokens":256,"messages":[{"role":"user","content":"What is the capital of France and what is its population?"}]}' "${SERVED_MODEL_NAME:-auto}")
 
 echo "▶ ${TEST_NAME}: Short single-turn Q&A"
 

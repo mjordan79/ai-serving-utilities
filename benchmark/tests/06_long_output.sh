@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/../lib.sh"
 
 TEST_NAME="long_output"
 
-payload=$(printf '{"model":"%s","stream":true,"temperature":0.7,"max_tokens":4096,"messages":[{"role":"user","content":"Write a comprehensive blog post about the evolution of distributed consensus algorithms. Start with the two-phase commit, move through Paxos and Raft, and discuss modern approaches like Narwhal and Bullshark. Include a comparison table and discuss the trade-offs between latency, throughput, and fault tolerance. Write in a technical but accessible style."}]}' "${MODEL_NAME:-auto}")
+payload=$(printf '{"model":"%s","stream":true,"temperature":0.7,"max_tokens":4096,"messages":[{"role":"user","content":"Write a comprehensive blog post about the evolution of distributed consensus algorithms. Start with the two-phase commit, move through Paxos and Raft, and discuss modern approaches like Narwhal and Bullshark. Include a comparison table and discuss the trade-offs between latency, throughput, and fault tolerance. Write in a technical but accessible style."}]}' "${SERVED_MODEL_NAME:-auto}")
 
 echo "▶ ${TEST_NAME}: Long output generation (up to 4096 tokens)"
 

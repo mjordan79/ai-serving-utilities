@@ -79,6 +79,8 @@ export VLLM_MAX_N_SEQUENCES
 
 # Model
 MODEL_NAME="${MODEL_NAME:-nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4}"
+# Name exposed via /v1/models.
+SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-vllm/nvidia/nemotron3.5-30b-a3b-nvfp4}"
 DTYPE="${DTYPE:-auto}"
 TP_SIZE="${TP_SIZE:-1}"
 
@@ -258,6 +260,7 @@ if [ -n "$EXTRA_ARGS_STR" ]; then
 fi
 
 exec vllm serve "$MODEL_NAME" \
+  --served-model-name "$SERVED_MODEL_NAME" \
   "${API_KEY_ARGS[@]}" \
   --dtype "$DTYPE" \
   --safetensors-load-strategy "$SAFETENSORS_LOAD_STRATEGY" \

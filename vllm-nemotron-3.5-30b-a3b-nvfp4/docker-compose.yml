@@ -45,6 +45,8 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MODEL_NAME
+      # Served name exposed via /v1/models; if unset the entrypoint default applies.
+      - SERVED_MODEL_NAME
       # Pass-through: if set in .env the entrypoint uses this key; if empty the
       # entrypoint generates and persists sk-<uuid> in the vllm-keys volume.
       - VLLM_API_KEY

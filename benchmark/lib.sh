@@ -25,14 +25,18 @@ MODEL_NEMOTRON_DIR="vllm-nemotron-3.5-30b-a3b-nvfp4"
 #   DIRECT_PORT    — host port published by the model's docker-compose.yml
 #   CONTAINER_NAME — container_name from the model's docker-compose.yml
 #   MODEL_ENGINE   — inference engine of the deployment (vllm|sglang)
+#   SERVED_MODEL_NAME — name exposed by the deployment via /v1/models. The
+#                       default mirrors the entrypoint default; a value
+#                       already present in the environment or in the project
+#                       .env (parsed later) wins.
 resolve_model_target() {
     local selector="${1:-qwen}"
-    local model_dir engine
+    local model_dir engine served
     case "$selector" in
-        qwen)     model_dir="$MODEL_QWEN_DIR";  engine="vllm" ;;
-        muse)     model_dir="$MODEL_MUSE_DIR";  engine="vllm" ;;
-        sglang)   model_dir="$MODEL_SGLANG_DIR"; engine="sglang" ;;
-        nemotron) model_dir="$MODEL_NEMOTRON_DIR"; engine="vllm" ;;
+        qwen)     model_dir="$MODEL_QWEN_DIR";  engine="vllm";   served="vllm/unsloth/qwen3.8-27b-nvfp4" ;;
+        muse)     model_dir="$MODEL_MUSE_DIR";  engine="vllm";   served="vllm/redhatai/museglimmer-30b-nvfp4" ;;
+        sglang)   model_dir="$MODEL_SGLANG_DIR"; engine="sglang"; served="sglang/gittensor/qwen3.8-27b-nvfp4-rtx5090" ;;
+        nemotron) model_dir="$MODEL_NEMOTRON_DIR"; engine="vllm"; served="vllm/nvidia/nemotron3.5-30b-a3b-nvfp4" ;;
         *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse, sglang, nemotron." >&2; return 1 ;;
     esac
     local suite_dir
@@ -49,7 +53,8 @@ resolve_model_target() {
         | sed 's/.*container_name:[[:space:]]*//' | tr -d '"\r' || true)
     [[ -n "$CONTAINER_NAME" ]] || { echo "ERROR: No container_name found in ${compose}" >&2; return 1; }
     MODEL_ENGINE="$engine"
-    export PROJECT_DIR DIRECT_PORT CONTAINER_NAME MODEL_ENGINE
+    SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-$served}"
+    export PROJECT_DIR DIRECT_PORT CONTAINER_NAME MODEL_ENGINE SERVED_MODEL_NAME
     echo "INFO: Target model '${selector}' → ${PROJECT_DIR} (port ${DIRECT_PORT}, container ${CONTAINER_NAME}, engine ${engine})" >&2
 }
 
