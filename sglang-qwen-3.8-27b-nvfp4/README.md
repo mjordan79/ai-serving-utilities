@@ -159,7 +159,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `HF_CACHE_VOLUME` | `hf-cache-gittensor` | Named volume for the HF cache |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
 | `MEM_FRACTION_STATIC` | `0.85` | Fraction of usable VRAM (0.0–1.0). Deviates from the model card (0.90): 0.85 is the zero-UVM-spill tuning for the WDDM/WSL2 target platform |
-| `TRUST_REMOTE_CODE` | `true` | Pass `--trust-remote-code` (required by some HF repos) |
+| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this checkpoint (no custom HF modeling code ships with it); set `true` only if the model gains a `modeling_*.py` / `auto_map` |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
 ### Performance
@@ -177,7 +177,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `MAMBA_SSM_DTYPE` | `bfloat16` | Mamba SSM data type |
-| `MAMBA_RADIX_CACHE_STRATEGY` | `extra_buffer` | Mamba radix cache strategy |
+| `MAMBA_RADIX_CACHE_STRATEGY` | `extra_buffer_lazy` | Mamba radix cache strategy (model card default) |
 
 ### Speculative decoding (DSpark v2)
 
@@ -192,14 +192,14 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ### Optional: vLLM-Copilot budget
 
-vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: they keep the Output Length picker and the input window inside the ~103.9K KV pool (worst case `67584 + 32768 = 100.4K`), so the client neither 400s the request nor triggers a silent `--allow-auto-truncate` prompt cut.
+vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: they keep the Output Length picker and the input window inside the measured ~129.6K KV pool (worst case `67584 + 32768 = 100.4K`), so the client neither 400s the request nor triggers a silent `--allow-auto-truncate` prompt cut.
 
 Recommended model entry (`sglang/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090`):
 
 | Parameter | Value | Rationale |
 |---|---|---|
-| `maxOutputTokens` | `[32768, 16384, 8192]` (array — Output Length picker, first value = default) | Effective per-request window is the KV pool (~103.9K tokens at `MEM_FRACTION_STATIC=0.85` on the WDDM/WSL2 target platform), not the 262K architecture ceiling. Default pick 32768 keeps the worst case `67584 + 32768 = 100.4K < 103.9K`. A 65536 pick would leave only ~38K input headroom: agent prompts (~30K) plus multi-turn history exceed it, and `--allow-auto-truncate` then **silently truncates the prompt** — losing context with no error. |
-| `maxInputTokens` | `67584` | Pinned below the auto-computed `pool − 32768 = 71.1K`: `67584 + 32768 = 100.4K` stays under the pool with ~3.5K slack. |
+| `maxOutputTokens` | `[32768, 16384, 8192]` (array — Output Length picker, first value = default) | Effective per-request window is the measured KV pool (~129.6K tokens at `MEM_FRACTION_STATIC=0.85` on the WDDM/WSL2 target platform), not the 262K architecture ceiling. Default pick 32768 keeps the worst case `67584 + 32768 = 100.4K < 129.6K`. A 65536 pick would leave ~64K input headroom: enough for the base agent prompt (~30K), but multi-turn history can still exceed it and `--allow-auto-truncate` would then **silently truncate the prompt** — losing context with no error. |
+| `maxInputTokens` | `67584` | Pinned below the auto-computed `pool − 32768 = 96.8K`: `67584 + 32768 = 100.4K` stays under the measured pool with ~29.2K slack. |
 
 **Trade-off:** omitting the 65536 pick removes one-shot very long generation. To get it back, raise `MEM_FRACTION_STATIC` to 0.90 — on the WDDM/WSL2 target platform 0.90 causes UVM spill, 0.85 avoids it — or accept that a second concurrent request waits for KV release.
 
@@ -263,7 +263,7 @@ The nginx control set is identical to the sibling vLLM stacks (allowlist, rate l
 
 - Port `1238` stays published on the host in proxy mode (see known limitation above) — LAN-only exposure; the non-allowlisted native surface is reachable on 1238 with no nginx in front.
 - `LETSENCRYPT_DOMAIN` is shared with the qwen stack — only one of the two can hold the public 80/443 proxy at a time (see Notes).
-- `TRUST_REMOTE_CODE=true` is on by default — a supply-chain trust in the Hugging Face repo, not a runtime API surface.
+- `TRUST_REMOTE_CODE` defaults to `false`: this checkpoint ships no custom HF modeling code (no `modeling_*.py`, no `auto_map`), so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint later gains a `modeling_*.py`/`auto_map`; with `true` it becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Notes
 

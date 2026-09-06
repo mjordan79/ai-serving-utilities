@@ -131,7 +131,7 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Prompt tokens details in responses |
 | `ENABLE_REQUEST_METRICS` | `false` | Per-request metrics (requires `DISABLE_LOG_STATS=false`) |
 | `DISABLE_LOG_STATS` | `true` | Disable periodic log stats |
-| `TRUST_REMOTE_CODE` | `true` | Trust remote code in the model repo |
+| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Nemotron 3.5 is a built-in vLLM architecture and the NVFP4 checkpoint is handled natively via `modelopt_fp4` — no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `EXTRA_ARGS_STR` | *(empty)* | Raw extra flags appended verbatim to `vllm serve` (escape hatch, e.g. `--num-gpu-workers 1`) |
 | `PORT` | `8000` | Container port |
 | `HF_TOKEN` | — | HuggingFace token (gated checkpoint) |
@@ -202,7 +202,7 @@ Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.28.
 **Residual risks:**
 
 - Port `1237` stays published on the host in proxy mode (the overlay's `ports: []` is a no-op — Compose merges lists, as documented in the qwen stack) — LAN-only exposure. The unauthenticated endpoints listed above are reachable on 1237 with no nginx in front.
-- `TRUST_REMOTE_CODE=true` is on by default — a supply-chain trust in the Hugging Face repo, not a runtime API surface. Set `TRUST_REMOTE_CODE=false` only after verifying the checkpoint loads without it.
+- `TRUST_REMOTE_CODE` defaults to `false`: Nemotron 3.5 loads through vLLM's built-in architecture registry and its NVFP4 weights are consumed natively via `modelopt_fp4`, so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint starts failing with a custom-code / `auto_map` load error; with `true` the flag becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Useful commands
 

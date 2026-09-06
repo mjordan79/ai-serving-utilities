@@ -167,7 +167,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `HF_CACHE_VOLUME` | `hf-cache-unsloth` | Named volume for the HF cache — one per variant |
 | `MAX_MODEL_LEN` | `116800` | Maximum context length — set per variant in `.env` (NVIDIA: `131072`, Unsloth: `116800`) |
 | `DTYPE` | `auto` | Data type for model weights |
-| `TRUST_REMOTE_CODE` | `true` | Pass `--trust-remote-code` (required by some HF repos) |
+| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Qwen3.8 is a built-in vLLM architecture and the compressed-tensors format is handled natively — no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `SKIP_MM_PROFILING` | `true` | Skip multimodal profiling at startup |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
@@ -264,7 +264,7 @@ Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/s
 **Residual risks:**
 
 - Port `1235` stays published on the host in proxy mode (see limitation above) — LAN-only exposure. `/v1/*` is Bearer-authenticated, but the unauthenticated endpoints listed above are reachable on 1235 with no nginx in front.
-- `TRUST_REMOTE_CODE=true` is on by default — a supply-chain trust in the Hugging Face repo, not a runtime API surface. Set `TRUST_REMOTE_CODE=false` only after verifying the checkpoint loads without it.
+- `TRUST_REMOTE_CODE` defaults to `false`: Qwen3.8 loads through vLLM's built-in architecture registry and its NVFP4 weights are consumed natively via `compressed-tensors`, so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint starts failing with a custom-code / `auto_map` load error; with `true` the flag becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Useful Commands
 

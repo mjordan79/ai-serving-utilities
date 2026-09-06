@@ -69,7 +69,7 @@ cd vllm-gemma-4-26b-a4b-nvfp4
 docker compose up -d
 ```
 
-The first run downloads the model (~15 GB of weights + the ~1 GB MTP draft head) and saves the HF cache in a named volume. Subsequent boots reuse the cache.
+The first run downloads the model (~15 GB of weights) and saves the HF cache in a named volume. Subsequent boots reuse the cache.
 
 **2b. HTTPS proxy (DuckDNS + Let's Encrypt)**
 
@@ -152,7 +152,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `HF_CACHE_VOLUME` | `hf-cache-gemma4` | Named volume for the HF cache |
 | `MAX_MODEL_LEN` | `131072` | Maximum context length |
 | `DTYPE` | `auto` | Data type for model weights |
-| `TRUST_REMOTE_CODE` | `true` | Pass `--trust-remote-code` (required by some HF repos) |
+| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Gemma 4 is a built-in vLLM architecture and the NVFP4 checkpoint is handled natively via `modelopt_fp4` — no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `SKIP_MM_PROFILING` | `false` | Gemma 4 is multimodal; multimodal profiling at startup stays on. Set `true` to skip it |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
@@ -212,8 +212,8 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 | Variable | Default | Description |
 |---|---|---|
-| `ENABLE_MTP` | `false` | MTP via the external draft head is not supported by vLLM v0.28.0; leave disabled for this image |
-| `MTP_NUM_SPECULATIVE_TOKENS` | `1` | Speculative tokens per step |
+| `ENABLE_MTP` | `false` | Disabled: vLLM v0.28.0 rejects the `mtp` speculative method during argument validation; leave disabled for this image |
+| `MTP_NUM_SPECULATIVE_TOKENS` | `1` | Speculative tokens per step — inert while MTP is disabled; kept for a future image that supports the `mtp` method |
 
 ### Proxy overlay (Let's Encrypt)
 
@@ -291,7 +291,7 @@ Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/s
 
 **Residual risk:** in proxy mode, port `1239` stays published on the LAN (see the Known limitation above). LAN hosts can reach vLLM directly, bypassing the nginx allowlist — acceptable for a home network, not for public exposure.
 
-**Supply chain:** `TRUST_REMOTE_CODE=true` runs Python code shipped inside the model repo. The repo is pinned to `nvidia/Gemma-4-26B-A4B-NVFP4`; a compromised upstream would execute on boot.
+**Supply chain:** `TRUST_REMOTE_CODE` defaults to `false`: Gemma 4 loads through vLLM's built-in architecture registry and its NVFP4 weights are consumed natively via `modelopt_fp4`, so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint starts failing with a custom-code / `auto_map` load error; with `true` the flag becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Useful Commands
 

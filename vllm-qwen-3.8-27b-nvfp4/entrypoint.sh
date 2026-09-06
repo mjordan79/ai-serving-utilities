@@ -114,7 +114,7 @@ SAFETENSORS_LOAD_STRATEGY="${SAFETENSORS_LOAD_STRATEGY:-prefetch}"
 SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-true}"
 # Default = Unsloth variant (compressed-tensors). NVIDIA variant: QUANTIZATION=modelopt in .env.
 QUANTIZATION="${QUANTIZATION:-compressed-tensors}"
-TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
+TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 
 # API
 PORT="${PORT:-8000}"

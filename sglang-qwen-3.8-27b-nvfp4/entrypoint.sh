@@ -89,7 +89,7 @@ TOOL_CALL_PARSER="${TOOL_CALL_PARSER:-qwen3_coder}"
 
 # Behavior
 ALLOW_AUTO_TRUNCATE="${ALLOW_AUTO_TRUNCATE:-true}"
-TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
+TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 
 # Logging (verbosity aligned with the sibling vLLM stack):
 # - LOG_LEVEL=info keeps the periodic "Decode batch ... gen throughput"

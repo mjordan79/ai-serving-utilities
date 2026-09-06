@@ -15,8 +15,8 @@ services:
       interval: 60s
       timeout: 5s
       retries: 3
-      # First boot downloads ~15 GB of weights + the ~1 GB MTP draft head;
-      # 1200s covers the cold-volume download + CUDA graph capture.
+      # First boot downloads ~15 GB of weights; 1200s covers the cold-volume
+      # download + CUDA graph capture.
       start_period: 1200s
 
     networks:

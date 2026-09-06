@@ -113,7 +113,7 @@ GENERATION_CONFIG="${GENERATION_CONFIG:-auto}"
 # Loading
 SAFETENSORS_LOAD_STRATEGY="${SAFETENSORS_LOAD_STRATEGY:-prefetch}"
 QUANTIZATION="${QUANTIZATION:-compressed-tensors}"
-TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
+TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 
 # Speculative decoding — DFlash draft head (per the recipe). OFF by default:
 # the 5.1 GB draft head OOMs on 1x RTX 5090 (~400 MiB headroom). Enable only

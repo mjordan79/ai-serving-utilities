@@ -142,7 +142,7 @@ SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-true}"
 # ModelOpt NVFP4 (W4A16). Empty string omits the flag — vLLM auto-detects
 # from the checkpoint's quantization_config if the flag is ever rejected.
 QUANTIZATION="${QUANTIZATION:-modelopt_fp4}"
-TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
+TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 
 # API
 PORT="${PORT:-8000}"

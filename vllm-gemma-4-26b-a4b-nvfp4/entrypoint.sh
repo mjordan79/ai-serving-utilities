@@ -122,7 +122,7 @@ SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-false}"
 # NVIDIA ModelOpt NVFP4 (W4A16). The checkpoint also declares its quantization
 # config; keep the explicit value overridable for compatibility testing.
 QUANTIZATION="${QUANTIZATION:-modelopt_fp4}"
-TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-true}"
+TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 
 # API
 PORT="${PORT:-8000}"
