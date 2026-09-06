@@ -201,6 +201,18 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `SPEC_MODEL` | `meta-models/Muse-Glimmer-30B-assistant` | DFlash draft head |
 | `SPEC_NUM_TOKENS` | `15` | Speculative tokens per step |
 
+### Optional: vLLM-Copilot budget
+
+vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: a generous `maxOutputTokens` protects the final `to=user` channel from empty-content truncation, and an unset `maxInputTokens` keeps every prompt + `max_tokens` pair inside the 128K window.
+
+Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| `maxOutputTokens` | `65536` | `MAX_MODEL_LEN=131072` gives 65536 output headroom at zero input. The cap must be generous (see *How this model answers*): a tight cap truncates the final `to=user` channel with an empty `content` field. |
+| `maxInputTokens` | *(unset)* | Auto-computed as `131072 − 65536 = 65536`. Do **not** pin it to a value above `MAX_MODEL_LEN − maxOutputTokens` (e.g. 100K): vLLM hard-rejects any request with `prompt + max_tokens > MAX_MODEL_LEN` with a 400 — an input claim of 100K is false on a 128K window. |
+| `defaultParams` | `{ temperature: 1.0, top_p: 0.95, top_k: 64 }` | Carries the checkpoint's tuned sampling (temp 1.0 / top_p 0.95 / top_k 64) on every request, per the model card. Without it the entry relies solely on the server's `--generation-config auto`; if that resolution changes, the model silently falls back to greedy. |
+
 ### Behavior & features
 
 | Variable | Default | Description |

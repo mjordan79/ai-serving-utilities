@@ -101,7 +101,7 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `QUANTIZATION` | `modelopt_fp4` | Quantization method. Leave empty to let vLLM auto-detect from the checkpoint config |
 | `HF_CACHE_VOLUME` | `hf-cache-nemotron` | Named volume holding the HuggingFace cache (checkpoint + weights) |
 | `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/vllm-cache/flashinfer_autotune` | FlashInfer kernel autotune cache, persisted in the `vllm-flashinfer-cache` volume. vLLM's default (`/tmp`) is wiped on container recreation and costs a ~15-30 s re-autotune at every boot |
-| `MAX_MODEL_LEN` | `65536` | Maximum context length (tokens). Raised 32K → 64K on 2026-08-26: GitHub Copilot + vllm-copilot prompts run ~29.5K tokens (instruction files, MCP schemas, editor context) and vLLM hard-rejects any request with `max_tokens + prompt > max_model_len`, so a 32K window left ~3K output headroom and 400'd deterministically. At 64K the full prompt + a 32K output budget fits (29.5K + 32K = 61.5K < 65.5K). Cost: the KV cache holds ~8 concurrent 64K sequences instead of ~16 — irrelevant for single-user interactive serving; drop back to `32768` if raw concurrency matters |
+| `MAX_MODEL_LEN` | `65536` | Maximum context length (tokens). Must hold prompt + output together: vLLM hard-rejects any request with `prompt + max_tokens > MAX_MODEL_LEN`. Agent IDE prompts (instruction files, MCP schemas, editor context) run ~29.5K tokens, so `29.5K prompt + 32K output = 61.5K < 65.5K` fits. Cost: at 64K the KV cache holds ~8 concurrent sequences vs ~16 at 32K — irrelevant for single-user interactive serving; drop back to `32768` if raw concurrency matters |
 | `DTYPE` | `auto` | Data type (`auto`, `bfloat16`, `float16`) |
 | `TP_SIZE` | `1` | Tensor parallelism size |
 | `ATTENTION_BACKEND` | *(empty)* | Attention backend. Leave empty to let vLLM auto-select; forcing one is not advised on this hybrid architecture (validated failure mode on the Gemma post-mortem) |
@@ -136,6 +136,18 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `PORT` | `8000` | Container port |
 | `HF_TOKEN` | — | HuggingFace token (gated checkpoint) |
 
+### Optional: vLLM-Copilot budget
+
+vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: ~29.5K-token agent prompts plus a 32K output budget fit the 64K window, so vLLM never 400s the request.
+
+Recommended model entry (`vllm/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4`):
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| `maxOutputTokens` | `32768` | `MAX_MODEL_LEN=65536`: agent prompts run ~29.5K tokens, so `29.5K + 32K = 61.5K < 65.5K` fits without a deterministic 400 (vLLM hard-rejects `prompt + max_tokens > MAX_MODEL_LEN`). A `max_tokens` above `MAX_MODEL_LEN` is unsatisfiable. |
+| `maxInputTokens` | *(unset)* | Auto-computed as `65536 − 32768 = 32768`. |
+| `defaultParams` | `{ temperature: 1, top_p: 0.95 }` | Matches the checkpoint's sampling profile (already present in the entry). |
+
 ### Hopper-only overrides
 
 The vLLM recipe defines overrides for Hopper (H100/H200) that are **not** part of the base args and are left off here because this repo targets sm_120 (RTX 5090), which the recipe does not cover. On Hopper hardware, enable them in `.env`:
@@ -150,7 +162,7 @@ MAX_NUM_BATCHED_TOKENS=32768
 
 ### Speculative decoding
 
-MTP is on by default (`ENABLE_MTP=true`, 3 tokens, Triton MoE backend) — it is built into the checkpoint and requires no separate draft model. If MTP misbehaves on this hardware, set `ENABLE_MTP=false`.
+MTP is on by default (`ENABLE_MTP=true`, 3 tokens, Triton MoE backend) — it is built into the checkpoint and requires no separate draft model. If MTP misbehaves on the target GPU, set `ENABLE_MTP=false`.
 
 **DSpark (next-iteration option, not wired up):** the model card recommends a DSpark drafter over the built-in MTP for low-concurrency, latency-sensitive serving — which is exactly this stack's profile (single GPU, interactive). DSpark is a separate checkpoint: `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4-DSpark`, and the card's recipe pairs it with `--speculative_config.model=<DSpark-checkpoint>` and `--speculative_config.num_speculative_tokens 3`. Before switching, collect the MTP acceptance rate from `/metrics` so the comparison is measured, not assumed.
 
@@ -172,7 +184,7 @@ If it starts but dies under load, apply the same three dials in the same order.
 
 ## Security posture
 
-Same nginx control set as the sibling vLLM stacks. This stack now runs **vLLM v0.28.0** — the same version the unauthenticated-endpoint list below was probed on.
+Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.28.0**; the unauthenticated-endpoint list below applies to v0.28.0.
 
 **What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
 

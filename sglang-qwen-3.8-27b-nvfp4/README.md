@@ -158,7 +158,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `MODEL_NAME` | `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` | HuggingFace model name — set in `.env` |
 | `HF_CACHE_VOLUME` | `hf-cache-gittensor` | Named volume for the HF cache |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
-| `MEM_FRACTION_STATIC` | `0.85` | Fraction of usable VRAM (0.0–1.0). Deviates from the model card (0.90): 0.85 is the zero-UVM-spill tuning on this WDDM/WSL2 host |
+| `MEM_FRACTION_STATIC` | `0.85` | Fraction of usable VRAM (0.0–1.0). Deviates from the model card (0.90): 0.85 is the zero-UVM-spill tuning for the WDDM/WSL2 target platform |
 | `TRUST_REMOTE_CODE` | `true` | Pass `--trust-remote-code` (required by some HF repos) |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
@@ -189,6 +189,19 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `SPECULATIVE_DRAFT_MODEL_QUANTIZATION` | `modelopt_fp4` | Drafter quantization (required for the NVFP4 checkpoint) |
 
 > The default DSpark profile is the fastest model-card configuration (161.7 tok/s). Use `SPECULATIVE_ALGORITHM=none` when the full 262K context window is required.
+
+### Optional: vLLM-Copilot budget
+
+vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: they keep the Output Length picker and the input window inside the ~103.9K KV pool (worst case `65536 + 32768 = 98.3K`), so the client neither 400s the request nor triggers a silent `--allow-auto-truncate` prompt cut.
+
+Recommended model entry (`sglang/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090`):
+
+| Parameter | Value | Rationale |
+|---|---|---|
+| `maxOutputTokens` | `[32768, 16384, 8192]` (array — Output Length picker, first value = default) | Effective per-request window is the KV pool (~103.9K tokens at `MEM_FRACTION_STATIC=0.85` on the WDDM/WSL2 target platform), not the 262K architecture ceiling. Default pick 32768 keeps the worst case `65536 + 32768 = 98.3K < 103.9K`. A 65536 pick would leave only ~38K input headroom: agent prompts (~30K) plus multi-turn history exceed it, and `--allow-auto-truncate` then **silently truncates the prompt** — losing context with no error. |
+| `maxInputTokens` | `65536` | Pinned (not auto-computed, which would be `pool − 32768 = 71.1K`): `65536 + 32768 = 98.3K` stays under the pool with ~5K slack. |
+
+**Trade-off:** omitting the 65536 pick removes one-shot very long generation. To get it back, raise `MEM_FRACTION_STATIC` to 0.90 — on the WDDM/WSL2 target platform 0.90 causes UVM spill, 0.85 avoids it — or accept that a second concurrent request waits for KV release.
 
 ### Behavior & features
 
@@ -254,7 +267,7 @@ The nginx control set is identical to the sibling vLLM stacks (allowlist, rate l
 
 ## Notes
 
-- **Image:** `lmsysorg/sglang:nightly-dev-cu13-20260901-07c8f729` is an immutable multi-arch snapshot of SGLang main containing the DSpark NVFP4 fix (PRs #34859 and #35496). It replaces `v0.5.18`, which crashes on the quantized drafter `lm_head`; the similarly named `nightly-cu134` tag is arm64-only and must not be used on this amd64 host.
+- **Image:** `lmsysorg/sglang:nightly-dev-cu13-20260901-07c8f729` is an immutable multi-arch snapshot of SGLang main containing the DSpark NVFP4 fix (PRs #34859 and #35496). It replaces `v0.5.18`, which crashes on the quantized drafter `lm_head`; the similarly named `nightly-cu134` tag is arm64-only and must not be used on the target amd64 platform.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `sglang-keys` volume at `/root/.sglang-key/.api_key`. Retrieve it with `docker exec sglang-qwen-server cat /root/.sglang-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
 - **DSpark v2:** enabled by default with the Gittensor drafter. It reaches the model-card profile of 161.7 tok/s on a dedicated 32 GB GPU; with speculation enabled the practical context window is about 165K tokens.
 - **VRAM:** with `MEM_FRACTION_STATIC=0.90` on 32 GB, the main model and approximately 1.4 GB drafter fit in the static budget.
