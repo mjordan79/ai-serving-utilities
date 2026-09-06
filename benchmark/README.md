@@ -47,8 +47,9 @@ The model is selected as the first positional argument (default `qwen`):
 | `muse` | `vllm-muse-glimmer-30b-nvfp4/` | `vllm-museglimmer-server` | 1236 |
 | `nemotron` | `vllm-nemotron-3.5-30b-a3b-nvfp4/` | `vllm-nemotron-server` | 1237 |
 | `sglang` | `sglang-qwen-3.8-27b-nvfp4/` | `sglang-qwen-server` | 1238 |
+| `gemma4` | `vllm-gemma-4-26b-a4b-nvfp4/` | `vllm-gemma4-server` | 1239 |
 
-The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR` / `MODEL_SGLANG_DIR` / `MODEL_NEMOTRON_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
+The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR` / `MODEL_SGLANG_DIR` / `MODEL_NEMOTRON_DIR` / `MODEL_GEMMA4_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
 
 | .env Variable | Auto-Derived | Used For |
 |---------------|--------------|----------|

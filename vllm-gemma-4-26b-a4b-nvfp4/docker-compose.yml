@@ -1,0 +1,118 @@
+# Pinned project name: decouples compose state (volumes, networks) from the folder name.
+name: vllm-gemma-4-26b-a4b-nvfp4
+
+services:
+  vllm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: vllm-gemma4-server
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      # First boot downloads ~15 GB of weights + the ~1 GB MTP draft head;
+      # 1200s covers the cold-volume download + CUDA graph capture.
+      start_period: 1200s
+
+    networks:
+      - gemma-net
+
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+    environment:
+      - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
+      - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR
+
+      # WSL2 only: Enables non-blocking per-step host -> device
+      # staging of attention metadata. Also required for UVA / V2 model runner.
+      - VLLM_WSL2_ENABLE_PIN_MEMORY=1
+
+      # Model runner selection at boot: 0 = V1, 1 = V2 [Experimental]. V2 requires
+      # VLLM_WSL2_ENABLE_PIN_MEMORY=1 (UVA) above. Gemma 4's V2 + auto-select
+      # mm-prefix attention path is unvalidated on the target platform; if boot or
+      # the first request fails on V2, flip to VLLM_USE_V2_MODEL_RUNNER=0 and
+      # restart (one-line fallback — V1 is the validated Gemma 4 path).
+      - VLLM_USE_V2_MODEL_RUNNER=1
+
+      # Shared-GPU safe budget: this stack coexists with the live qwen stack
+      # on the same 32 GB card. Raise to 0.92-0.94 when the GPU is exclusive.
+      - GPU_MEMORY_UTILIZATION=0.88
+
+      # Gemma 4 model card: thinking is not carried in multi-turn history.
+      - DEFAULT_ENABLE_THINKING=false
+
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - MODEL_NAME
+      # Served name exposed via /v1/models. If unset the entrypoint default
+      # applies; override in .env if needed.
+      - SERVED_MODEL_NAME
+      # Pass-through: if set in .env the entrypoint uses this key; if empty the
+      # entrypoint generates and persists sk-<uuid> in the vllm-keys volume.
+      - VLLM_API_KEY
+      - ENABLE_API_KEY
+      - DTYPE
+      - SAFETENSORS_LOAD_STRATEGY
+      - TP_SIZE
+      - ATTENTION_BACKEND
+      - MOE_BACKEND
+      - PERFORMANCE_MODE
+      - KV_CACHE_DTYPE
+      - MAX_MODEL_LEN
+      - MAX_NUM_SEQS
+      - VLLM_MAX_N_SEQUENCES
+      - MAX_NUM_BATCHED_TOKENS
+      - ENABLE_CHUNKED_PREFILL
+      - ENABLE_PREFIX_CACHING
+      - ENABLE_HYBRID_KV_CACHE_MANAGER
+      - REASONING_PARSER
+      - TOOL_CALL_PARSER
+      - LANGUAGE_MODEL_ONLY
+      - ENABLE_AUTO_TOOL_CHOICE
+      - QUANTIZATION
+      - SKIP_MM_PROFILING
+      # vLLM v0.28.0 rejects speculative-config method=mtp before startup.
+      - ENABLE_MTP=false
+      - DEFAULT_PRESERVE_THINKING
+      - MTP_NUM_SPECULATIVE_TOKENS
+      - TRUST_REMOTE_CODE
+      - ENABLE_PROMPT_TOKENS_DETAILS
+      - ENABLE_REQUEST_METRICS
+      - DISABLE_LOG_STATS
+      - PORT
+      # --- HuggingFace ---
+      - HF_TOKEN
+
+    volumes:
+      # Default fallback = Gemma 4 cache (matches the documented default).
+      - ${HF_CACHE_VOLUME:-hf-cache-gemma4}:/root/.cache/huggingface
+      - vllm-keys:/root/.vllm-key
+
+    ports:
+      - "1239:8000"
+
+    ipc: host
+
+networks:
+  gemma-net:
+    attachable: true
+
+volumes:
+  # Explicit names = deterministic volumes (the project name is pinned above),
+  # so state survives even if the folder or compose file moves.
+  hf-cache-gemma4:
+    name: vllm-gemma-4-26b-a4b-nvfp4_hf-cache-gemma4
+  vllm-keys:
+    name: vllm-gemma-4-26b-a4b-nvfp4_vllm-keys

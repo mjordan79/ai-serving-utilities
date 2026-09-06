@@ -17,9 +17,10 @@ MODEL_QWEN_DIR="vllm-qwen-3.8-27b-nvfp4"
 MODEL_MUSE_DIR="vllm-muse-glimmer-30b-nvfp4"
 MODEL_SGLANG_DIR="sglang-qwen-3.8-27b-nvfp4"
 MODEL_NEMOTRON_DIR="vllm-nemotron-3.5-30b-a3b-nvfp4"
+MODEL_GEMMA4_DIR="vllm-gemma-4-26b-a4b-nvfp4"
 
 # Resolve the target model deployment.
-#   $1 = model selector (qwen|muse|sglang|nemotron), default qwen.
+#   $1 = model selector (qwen|muse|sglang|nemotron|gemma4), default qwen.
 # Exports:
 #   PROJECT_DIR    — absolute path to the model deployment directory
 #   DIRECT_PORT    — host port published by the model's docker-compose.yml
@@ -37,7 +38,8 @@ resolve_model_target() {
         muse)     model_dir="$MODEL_MUSE_DIR";  engine="vllm";   served="vllm/redhatai/museglimmer-30b-nvfp4" ;;
         sglang)   model_dir="$MODEL_SGLANG_DIR"; engine="sglang"; served="sglang/gittensor/qwen3.8-27b-nvfp4-rtx5090" ;;
         nemotron) model_dir="$MODEL_NEMOTRON_DIR"; engine="vllm"; served="vllm/nvidia/nemotron3.5-30b-a3b-nvfp4" ;;
-        *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse, sglang, nemotron." >&2; return 1 ;;
+        gemma4)   model_dir="$MODEL_GEMMA4_DIR";   engine="vllm"; served="vllm/nvidia/gemma-4-26b-a4b-nvfp4" ;;
+        *) echo "ERROR: Unknown model '${selector}'. Valid models: qwen, muse, sglang, nemotron, gemma4." >&2; return 1 ;;
     esac
     local suite_dir
     suite_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

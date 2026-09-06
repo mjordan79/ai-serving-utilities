@@ -1,0 +1,4 @@
+# Minimal template for docker-gen (required by acme-companion)
+# This file is a no-op — nginx uses static config (nginx/default.conf)
+# Docker-gen needs at least one variable to stay alive with -watch
+{{ range $key, $val := .Env }}{{ end }}

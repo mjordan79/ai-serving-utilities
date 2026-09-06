@@ -83,7 +83,7 @@ Once the certificate is ready, access the API at `https://<your-domain.duckdns.o
 
 > **Without the proxy overlay**, the API is exposed directly on port `1238` (HTTP). Compose binds this port on `0.0.0.0` by default, so it is reachable from the LAN, not only localhost. It is Bearer-authenticated, but use the TLS proxy for anything non-local.
 >
-> **Port 80/443 conflict:** every proxy overlay in this repo binds the same host ports 80/443 — **only one proxy can run at a time** (this proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same domain). The direct-mode ports do not conflict (Qwen-vLLM `1235`, Muse `1236`, Nemotron `1237`, Qwen-SGLang `1238`).
+> **Port 80/443 conflict:** every proxy overlay in this repo binds the same host ports 80/443 — **only one proxy can run at a time** (this proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same domain). The direct-mode ports do not conflict (Qwen-vLLM `1235`, Muse `1236`, Nemotron `1237`, Qwen-SGLang `1238`, Gemma 4 `1239`).
 
 ### 3. Get your API key
 
