@@ -270,7 +270,7 @@ ns_to_ms() {
 }
 
 # ── Curl wrapper: chat completion (non-streaming for accurate metrics) ──────
-# vLLM v0.27.1 no longer sends usage in SSE chunks. Use stream=false for
+# vLLM v0.28.0 no longer sends usage in SSE chunks. Use stream=false for
 # authoritative token counts and metrics.time_to_first_token_ms for TTFT.
 #
 # Returns metrics via global variables:
@@ -440,7 +440,7 @@ run_chat_stream() {
     fi
 
     # Force non-streaming mode for accurate token counts
-    # vLLM v0.27.1 does not send usage in SSE chunks
+    # vLLM v0.28.0 does not send usage in SSE chunks
     local nostream_payload
     nostream_payload=$(printf '%s' "$payload" | sed 's/"stream":true/"stream":false/')
 

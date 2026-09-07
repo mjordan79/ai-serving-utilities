@@ -71,7 +71,7 @@ VLLM_MAX_N_SEQUENCES="${VLLM_MAX_N_SEQUENCES:-16}"
 export VLLM_MAX_N_SEQUENCES
 
 # Model
-MODEL_NAME="${MODEL_NAME:-unsloth/Qwen3-8-27B-NVFP4}"
+MODEL_NAME="${MODEL_NAME:-unsloth/Qwen3.8-27B-NVFP4}"
 # Name exposed via /v1/models. Follows the unsloth default; when switching to
 # the nvidia variant in .env, override SERVED_MODEL_NAME there as well.
 SERVED_MODEL_NAME="${SERVED_MODEL_NAME:-vllm/unsloth/qwen3.8-27b-nvfp4}"

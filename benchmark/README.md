@@ -153,14 +153,14 @@ simple_chat    3    15    51    241    1820    28.02
 
 ## Notes
 
-- `MAX_NUM_SEQS=1` in the deployment means only one concurrent request. These benchmarks are sequential by design.
+- Concurrency differs by target: qwen, muse and gemma4 run with `MAX_NUM_SEQS=1` (one concurrent request), nemotron with `MAX_NUM_SEQS=8`, and the sglang target with `MAX_RUNNING_REQUESTS=2`. The suite issues requests sequentially; TPS across targets is comparable only within the same concurrency regime.
 - Run both deployments (qwen vs muse) on the **same hardware, same load** for a fair comparison.
 - GPU temperature affects performance. Let the system stabilize between runs.
 - The warmup script is not optional — Triton kernel compilation on first use adds significant latency.
 
-### vLLM v0.27.1 Specifics
+### vLLM v0.28.0 Specifics
 
-- **No usage in SSE chunks**: vLLM v0.27.1 does NOT send `usage` in streaming chunks. Token counts are extracted from non-streaming responses (`stream=false`) for authoritative counts.
+- **No usage in SSE chunks**: vLLM v0.28.0 does NOT send `usage` in streaming chunks. Token counts are extracted from non-streaming responses (`stream=false`) for authoritative counts.
 - **TTFT from metrics**: Non-streaming responses include `metrics.time_to_first_token_ms` for accurate TTFT measurement.
 - **Reasoning/Thinking**: Model uses `"reasoning"` field during thinking phase, `"content"` for final response. `json_get_delta_content()` handles both.
 - **Health endpoint**: `/health` returns HTTP 200 with **empty body** (no JSON). Use `/v1/models` for model verification (requires auth).

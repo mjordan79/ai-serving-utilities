@@ -186,7 +186,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `ENABLE_PREFIX_CACHING` | `true` | Cache shared prompt prefixes |
 | `ENABLE_HYBRID_KV_CACHE_MANAGER` | `true` | Hybrid (CPU+GPU) KV cache manager |
 | `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding) |
-| `MTP_NUM_SPECULATIVE_TOKENS` | `2` | Speculative tokens per step |
+| `MTP_NUM_SPECULATIVE_TOKENS` | `3` | Speculative tokens per step |
 
 ### Behavior & features
 
@@ -232,7 +232,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 - **Variants:** `unsloth/Qwen3.8-27B-NVFP4` (Compressed-Tensors, default) and `nvidia/Qwen3.6-27B-NVFP4` (ModelOpt). To switch, edit the `MODEL_NAME` / `QUANTIZATION` / `HF_CACHE_VOLUME` / `MAX_MODEL_LEN` block in `.env` and run `docker compose up -d`. Each variant has its own HF cache volume, so the first run after a switch downloads that variant's weights.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-qwen-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
-- **MTP (Multi-Token Prediction):** the NVFP4 checkpoints include up to 3 MTP layers. Default is 2 speculative tokens for better compute/accuracy balance (per-position acceptance rate ~60-70% at position 1-2 vs ~30-50% at position 3). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
+- **MTP (Multi-Token Prediction):** the NVFP4 checkpoints include up to 3 MTP layers; the entrypoint default is 3 speculative tokens per step (override with `MTP_NUM_SPECULATIVE_TOKENS`). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.1 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on host port `1235` (mapped from internal port 8000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.

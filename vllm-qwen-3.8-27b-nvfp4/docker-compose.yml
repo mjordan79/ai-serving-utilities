@@ -72,6 +72,8 @@ services:
       - QUANTIZATION
       - SKIP_MM_PROFILING
       - ENABLE_MTP
+      # Qwen stack: thinking kept off by default (the entrypoint generic
+      # default is true; per-request chat_template_kwargs can override it).
       - DEFAULT_ENABLE_THINKING=false
       - DEFAULT_PRESERVE_THINKING
       - MTP_NUM_SPECULATIVE_TOKENS
