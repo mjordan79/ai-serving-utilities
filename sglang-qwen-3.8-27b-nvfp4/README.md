@@ -5,7 +5,7 @@
 Docker Compose deployment for Qwen 27B NVFP4 on SGLang (OpenAI-compatible API).
 
 - **Model** — `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (NVFP4, Mamba/hybrid attention)
-- **Image** — `lmsysorg/sglang:nightly-dev-cu13-20260901-07c8f729` (pinned multi-arch snapshot, see *Notes*)
+- **Image** — `lmsysorg/sglang:nightly-dev-cu13-20260908-20ca564b` (pinned multi-arch snapshot, see *Notes*)
 - **Speculative decoding** — DSpark v2 drafter, enabled by default (set `SPECULATIVE_ALGORITHM=none` for full context)
 
 by Renato Perini (mjordan79)
@@ -267,10 +267,10 @@ The nginx control set is identical to the sibling vLLM stacks (allowlist, rate l
 
 ## Notes
 
-- **Image:** `lmsysorg/sglang:nightly-dev-cu13-20260901-07c8f729` is an immutable multi-arch snapshot of SGLang main containing the DSpark NVFP4 fix (PRs #34859 and #35496). It replaces `v0.5.18`, which crashes on the quantized drafter `lm_head`; the similarly named `nightly-cu134` tag is arm64-only and must not be used on the target amd64 platform.
+- **Image:** `lmsysorg/sglang:nightly-dev-cu13-20260908-20ca564b` is an immutable multi-arch snapshot of SGLang main containing the DSpark NVFP4 fix (PRs #34859 and #35496). It replaces `v0.5.18`, which crashes on the quantized drafter `lm_head`; the similarly named `nightly-cu134` tag is arm64-only and must not be used on the target amd64 platform.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `sglang-keys` volume at `/root/.sglang-key/.api_key`. Retrieve it with `docker exec sglang-qwen-server cat /root/.sglang-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
 - **DSpark v2:** enabled by default with the Gittensor drafter. It reaches the model-card profile of 161.7 tok/s on a dedicated 32 GB GPU; with speculation enabled the practical context window is about 165K tokens.
-- **VRAM:** with `MEM_FRACTION_STATIC=0.90` on 32 GB, the main model and approximately 1.4 GB drafter fit in the static budget.
+- **VRAM:** with `MEM_FRACTION_STATIC=0.85` on 32 GB, the main model and approximately 1.4 GB drafter fit in the static budget.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts (named volume `hf-cache-gittensor`).
 - **Port:** the API is exposed on host port `1238` (mapped from internal port 30000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
 - **Reverse Proxy:** two modes via overlay:
