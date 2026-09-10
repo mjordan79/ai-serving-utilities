@@ -35,12 +35,12 @@ services:
 
       # WSL2 only: Enables non-blocking per-step host -> device
       # staging of attention metadata. Also required for UVA / V2 model runner.
-      - VLLM_WSL2_ENABLE_PIN_MEMORY=0
+      - VLLM_WSL2_ENABLE_PIN_MEMORY=1
 
-      # Model runner selection at boot: 0 = V1 (pinned — hybrid
-      # Mamba/attention models default to the V2 runner), 1 = V2.
-      # V2 [Experimental] requires VLLM_WSL2_ENABLE_PIN_MEMORY=1 (UVA) above.
-      - VLLM_USE_V2_MODEL_RUNNER=0
+      # V2 model runner is the GA default on vLLM 0.29; VLLM_WSL2_ENABLE_PIN_MEMORY=1
+      # above enables its UVA path on WSL2. Explicitly selected here; one-line
+      # fallback to V1 if boot or the first request fails: set the value to `0`.
+      - VLLM_USE_V2_MODEL_RUNNER=1
 
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
@@ -62,6 +62,8 @@ services:
       - MAX_NUM_SEQS
       - VLLM_MAX_N_SEQUENCES
       - MAX_NUM_BATCHED_TOKENS
+      - MAX_NUM_QUEUED_REQS
+      - MAX_NUM_QUEUED_TOKENS
       - ENABLE_CHUNKED_PREFILL
       - ENABLE_PREFIX_CACHING
       - ENABLE_HYBRID_KV_CACHE_MANAGER
@@ -85,6 +87,7 @@ services:
       - ENABLE_MTP
       - MTP_NUM_SPECULATIVE_TOKENS
       - MTP_MOE_BACKEND
+      - PER_REQUEST_SPEC_DECODE_METRICS
       - TRUST_REMOTE_CODE
       - ENABLE_PROMPT_TOKENS_DETAILS
       - ENABLE_REQUEST_METRICS

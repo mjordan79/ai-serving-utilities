@@ -87,6 +87,16 @@ KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-1}"
 MAX_NUM_BATCHED_TOKENS="${MAX_NUM_BATCHED_TOKENS:-6144}"
 
+# Admission control (server-side backstop complementing the nginx rate
+# limiting): hard cap on in-flight requests (waiting + running) and on
+# total queued prefill tokens; overflow -> HTTP 503 from the engine.
+# MAX_NUM_QUEUED_TOKENS accepts human-readable integers (4K, 64K, 128K, 256K).
+# REQS 4 is 4x MAX_NUM_SEQS; 128K spans the full single-prompt context
+# (MAX_MODEL_LEN) so a long prompt is admitted, and still sits far above the
+# heaviest benchmark prefill (~4K) so normal use never trips the backstop.
+MAX_NUM_QUEUED_REQS="${MAX_NUM_QUEUED_REQS:-4}"
+MAX_NUM_QUEUED_TOKENS="${MAX_NUM_QUEUED_TOKENS:-128K}"
+
 # Attention & Performance
 ATTENTION_BACKEND="${ATTENTION_BACKEND:-flashinfer}"
 PERFORMANCE_MODE="${PERFORMANCE_MODE:-interactivity}"
@@ -94,6 +104,12 @@ PERFORMANCE_MODE="${PERFORMANCE_MODE:-interactivity}"
 # Features
 ENABLE_MTP="${ENABLE_MTP:-true}"
 MTP_NUM_SPECULATIVE_TOKENS="${MTP_NUM_SPECULATIVE_TOKENS:-3}"
+# Per-request speculative-decoding acceptance metrics in the response body
+# (metrics.speculative_decoding): none | summary | detailed. vLLM refuses to
+# start if set to a non-none value while speculative decoding is disabled;
+# reported only for single-sequence requests (n=1); independent of
+# --disable-log-stats.
+PER_REQUEST_SPEC_DECODE_METRICS="${PER_REQUEST_SPEC_DECODE_METRICS:-none}"
 ENABLE_CHUNKED_PREFILL="${ENABLE_CHUNKED_PREFILL:-true}"
 ENABLE_PREFIX_CACHING="${ENABLE_PREFIX_CACHING:-true}"
 ENABLE_HYBRID_KV_CACHE_MANAGER="${ENABLE_HYBRID_KV_CACHE_MANAGER:-true}"
@@ -160,6 +176,19 @@ if [ "$DISABLE_LOG_STATS" = "true" ]; then
   DISABLE_LOG_STATS_ARGS=(--disable-log-stats)
 fi
 
+SPEC_DECODE_METRICS_ARGS=()
+if [ "$PER_REQUEST_SPEC_DECODE_METRICS" != "none" ]; then
+  SPEC_DECODE_METRICS_ARGS=(--per-request-spec-decode-metrics "$PER_REQUEST_SPEC_DECODE_METRICS")
+fi
+
+ADMISSION_ARGS=()
+if [ -n "$MAX_NUM_QUEUED_REQS" ]; then
+  ADMISSION_ARGS+=(--max-num-queued-reqs "$MAX_NUM_QUEUED_REQS")
+fi
+if [ -n "$MAX_NUM_QUEUED_TOKENS" ]; then
+  ADMISSION_ARGS+=(--max-num-queued-tokens "$MAX_NUM_QUEUED_TOKENS")
+fi
+
 SKIP_MM_ARGS=()
 if [ "$SKIP_MM_PROFILING" = "true" ]; then
   SKIP_MM_ARGS=(--skip-mm-profiling)
@@ -205,5 +234,7 @@ exec vllm serve "$MODEL_NAME" \
   "${PROMPT_TOKENS_ARGS[@]}" \
   "${REQUEST_METRICS_ARGS[@]}" \
   "${DISABLE_LOG_STATS_ARGS[@]}" \
+  "${SPEC_DECODE_METRICS_ARGS[@]}" \
+  "${ADMISSION_ARGS[@]}" \
   --uvicorn-log-level warning \
   --port "$PORT"

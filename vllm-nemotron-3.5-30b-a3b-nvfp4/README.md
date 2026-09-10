@@ -4,10 +4,10 @@ Self-contained vLLM deployment for the **NVIDIA-Nemotron-3.5-Lightning-30B-A3B-N
 checkpoint (ModelOpt NVFP4 W4A16) from HuggingFace.
 
 - **Producer:** NVIDIA — **Publisher:** NVIDIA
-- **Architecture:** hybrid Mamba (SSM) + MoE attention — 30B total parameters, ~3B active per token. Because of the hybrid layout vLLM routes it through the V1 model runner on WDDM (see *Known issues*) and applies Mamba-cache flags that a plain dense model would not use.
+- **Architecture:** hybrid Mamba (SSM) + MoE attention — 30B total parameters, ~3B active per token. Because of the hybrid layout the stack pins the V2 model runner explicitly (see *Known issues*) and applies Mamba-cache flags that a plain dense model would not use.
 - **Model ID:** `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` (~18 GB download)
-- **Base image:** `vllm/vllm-openai:v0.28.0` (current stable vLLM release; the official deployment recipe's minimum for this model is v0.27.1)
-- **vLLM flags:** base-recipe args (flashinfer Mamba backend, `align` cache mode, prefix caching) + NVFP4 variant (fp8 KV cache, Marlin MoE kernel) + built-in MTP speculative decoding (3 tokens, Triton MoE backend). Hopper-only overrides are exposed but **off by default** (see *Hopper-only overrides*): this repo targets a RTX 5090 (sm_120), which the recipe does not list.
+- **Base image:** `vllm/vllm-openai:v0.29.0` (current stable vLLM release; the official deployment recipe's minimum for this model is v0.27.1)
+- **vLLM flags:** base-recipe args (flashinfer Mamba backend, `align` cache mode, prefix caching) + NVFP4 variant (fp8 KV cache, MoE kernel auto-selected per model part: MARLIN for the quantized main model, a triton-family backend for the unquantized MTP draft MoE) + built-in MTP speculative decoding (3 speculative tokens per step). Hopper-only overrides are exposed but **off by default** (see *Hopper-only overrides*): this repo targets an RTX 5090 (sm_120), which the recipe does not list.
 - **Local endpoint:** `http://localhost:1237` — container `vllm-nemotron-server`
 - **Reverse proxy (optional):** `docker-compose.proxy.yml` on DuckDNS (`your-domain.duckdns.org`) — see *Reverse Proxy (optional)*. Only one stack may hold ports 80/443 at a time (Qwen on 1235, Muse on 1236, this stack on 1237, Qwen-SGLang on 1238, Gemma 4 on 1239).
 
@@ -110,10 +110,12 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of GPU memory for weights + KV cache. 0.94 targets the dedicated-card profile: the RTX 5090 serves this model exclusively, so higher utilization translates directly into KV cache headroom |
 | `MAX_NUM_SEQS` | `8` | Max concurrent sequences (conservative start; Hopper-only target is 256) |
 | `MAX_NUM_BATCHED_TOKENS` | `8192` | Max batched tokens per step (recipe base is 16384; Hopper-only target is 32768) |
+| `MAX_NUM_QUEUED_REQS` | `32` | Admission cap: max in-flight requests (waiting + running); `32` = `4× MAX_NUM_SEQS` (`8`). Overflow → HTTP `503` |
+| `MAX_NUM_QUEUED_TOKENS` | `256K` | Admission cap: max queued prefill tokens counted conservatively (prefix-cache hits are not subtracted); `256K` = `32 × MAX_NUM_BATCHED_TOKENS`, one full batched-token window per admitted request. Overflow → HTTP `503` |
 | `ENABLE_CHUNKED_PREFILL` | `true` | Chunk long prefill to protect TTFT under load |
 | `ENABLE_PREFIX_CACHING` | `true` | Cache shared prompt prefixes |
 | `ENABLE_HYBRID_KV_CACHE_MANAGER` | `true` | Hybrid KV cache manager (Mamba + attention) |
-| `MOE_BACKEND` | `marlin` | MoE kernel (NVFP4 variant of the recipe) |
+| `MOE_BACKEND` | *(empty)* | MoE kernel; empty lets the vLLM oracle auto-select a supported backend per model part (the unquantized MTP draft model rejects marlin). Set `marlin` only when MTP is off |
 | `LINEAR_BACKEND` | *(empty)* | **Hopper-only.** Set to `humming` on H100/H200 only |
 | `MAMBA_BACKEND` | `flashinfer` | SSM backend. If flashinfer fails on sm_120, fall back to `triton` |
 | `MAMBA_CACHE_MODE` | `align` | Mamba cache alignment mode (recipe base) |
@@ -124,7 +126,8 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `ASYNC_SCHEDULING` | *(empty)* | **Hopper-only.** Async scheduling; set on H100/H200 only |
 | `ENABLE_MTP` | `true` | MTP (multi-token prediction) speculative decoding — built into the checkpoint |
 | `MTP_NUM_SPECULATIVE_TOKENS` | `3` | Speculative tokens per step (recipe Blackwell value) |
-| `MTP_MOE_BACKEND` | `triton` | MoE backend inside the speculative config; empty omits the key from the JSON |
+| `MTP_MOE_BACKEND` | `triton` | Emits a `"moe_backend"` key into the speculative-config JSON; empty omits the key. On 0.29.0 this key is not honored on the unquantized MTP-draft path — the draft MoE backend follows the global `MOE_BACKEND` selection (empty → vLLM oracle auto-selects) |
+| `PER_REQUEST_SPEC_DECODE_METRICS` | `none` | Per-request spec-decode acceptance metrics in the response (`metrics.speculative_decoding`): `none` off \| `summary` \| `detailed` |
 | `REASONING_PARSER` | `nemotron_v3` | Reasoning (thinking) block parser (recipe feature) |
 | `ENABLE_AUTO_TOOL_CHOICE` | `true` | Enable automatic tool choice |
 | `TOOL_CALL_PARSER` | `qwen3_coder` | Tool-call parser. `qwen3_coder` appears in every official NVIDIA snippet (vLLM/TRT-LLM/SGLang) for this checkpoint — it supersedes the vLLM recipe's `qwen3_xml` |
@@ -162,7 +165,9 @@ MAX_NUM_BATCHED_TOKENS=32768
 
 ### Speculative decoding
 
-MTP is on by default (`ENABLE_MTP=true`, 3 tokens, Triton MoE backend) — it is built into the checkpoint and requires no separate draft model. If MTP misbehaves on the target GPU, set `ENABLE_MTP=false`.
+MTP is on by default (`ENABLE_MTP=true`, 3 speculative tokens per step). The MTP block — one attention layer plus one MoE layer (`num_nextn_predict_layers: 1`, 270 MTP tensors in the weight index) — is built into the checkpoint, so no separate draft model is needed. The draft's MoE kernel follows the global `MOE_BACKEND` selection: empty lets the vLLM oracle auto-select a supported backend per model part (triton-family for the unquantized draft). If MTP misbehaves on the target GPU, set `ENABLE_MTP=false`.
+
+**Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` response field: `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`; vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled.
 
 **DSpark (next-iteration option, not wired up):** the model card recommends a DSpark drafter over the built-in MTP for low-concurrency, latency-sensitive serving — which is exactly this stack's profile (single GPU, interactive). DSpark is a separate checkpoint: `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4-DSpark`, and the card's recipe pairs it with `--speculative_config.model=<DSpark-checkpoint>` and `--speculative_config.num_speculative_tokens 3`. Before switching, collect the MTP acceptance rate from `/metrics` so the comparison is measured, not assumed.
 
@@ -178,15 +183,16 @@ If it starts but dies under load, apply the same three dials in the same order.
 
 ## Known issues
 
-- **Model runner:** `VLLM_USE_V2_MODEL_RUNNER=0` is pinned in `docker-compose.yml`: hybrid Mamba/attention models default to the (still experimental) V2 model runner at boot; this stack stays on the V1 runner.
+- **Model runner:** `VLLM_USE_V2_MODEL_RUNNER=1` is explicitly pinned in `docker-compose.yml` — the V2 model runner is the GA default on vLLM 0.29, so the pin is redundant but kept as a one-line rollback surface; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` (also in the compose) enables the V2 UVA path on the target WSL2 platform. If V2 fails to boot or on the first request, set `VLLM_USE_V2_MODEL_RUNNER=0` to fall back to the V1 runner and recreate the container.
 - **Do not force `ATTENTION_BACKEND`:** forcing a backend on this hybrid architecture is a validated crash mode (Gemma post-mortem). Leave it empty; vLLM auto-selects.
 - **`MAMBA_BACKEND=flashinfer` on sm_120:** the recipe pins flashinfer for the Mamba backend; if it fails to initialize on sm_120, fall back to `MAMBA_BACKEND=triton` in `.env`.
+- **`MAX_MODEL_LEN`:** the live `.env` sets `MAX_MODEL_LEN=auto` (the `.env.example` ships `32768`); the effective context is whatever fits the KV pool budget at boot — confirm the resolved value in the boot log.
 
 ## Security posture
 
-Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.28.0**; the unauthenticated-endpoint list below applies to v0.28.0.
+Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.29.0**; the unauthenticated-endpoint list below applies to v0.29.0.
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
 
 **Controls (nginx, HTTPS path):**
 
@@ -197,7 +203,7 @@ Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.28.
 | Body-size cap | `client_max_body_size 4m` | the full context window fits with margin; bounds abuse |
 | TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
 
-**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, profilers, gRPC and endpoint plugins are off by default in this entrypoint.
+**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, profilers, gRPC and endpoint plugins are off by default in this entrypoint. Admission control (`--max-num-queued-reqs` / `--max-num-queued-tokens`, defaults `32` / `256K`) caps in-flight requests and queued prefill tokens server-side; overflow returns HTTP `503` from the engine as a backstop under the nginx rate limit.
 
 **Residual risks:**
 

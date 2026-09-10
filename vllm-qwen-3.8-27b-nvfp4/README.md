@@ -179,6 +179,8 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
+| `MAX_NUM_QUEUED_REQS` | `4` | Admission cap: max in-flight requests (waiting + running); `4` = `4× MAX_NUM_SEQS`. Overflow → HTTP `503` |
+| `MAX_NUM_QUEUED_TOKENS` | `128K` | Admission cap: max queued prefill tokens counted conservatively (prefix-cache hits are not subtracted); `128K` spans the full single-prompt context, so a long prompt up to `MAX_MODEL_LEN` is admitted. Overflow → HTTP `503` |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
 | `PERFORMANCE_MODE` | `interactivity` | vLLM performance mode |
@@ -187,6 +189,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `ENABLE_HYBRID_KV_CACHE_MANAGER` | `true` | Hybrid (CPU+GPU) KV cache manager |
 | `ENABLE_MTP` | `true` | Multi-Token Prediction (speculative decoding) |
 | `MTP_NUM_SPECULATIVE_TOKENS` | `3` | Speculative tokens per step |
+| `PER_REQUEST_SPEC_DECODE_METRICS` | `none` | Per-request spec-decode acceptance metrics in the response (`metrics.speculative_decoding`): `none` off \| `summary` \| `detailed` |
 
 ### Behavior & features
 
@@ -232,7 +235,8 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 - **Variants:** `unsloth/Qwen3.8-27B-NVFP4` (Compressed-Tensors, default) and `nvidia/Qwen3.6-27B-NVFP4` (ModelOpt). To switch, edit the `MODEL_NAME` / `QUANTIZATION` / `HF_CACHE_VOLUME` / `MAX_MODEL_LEN` block in `.env` and run `docker compose up -d`. Each variant has its own HF cache volume, so the first run after a switch downloads that variant's weights.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-qwen-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
-- **MTP (Multi-Token Prediction):** the NVFP4 checkpoints include up to 3 MTP layers; the entrypoint default is 3 speculative tokens per step (override with `MTP_NUM_SPECULATIVE_TOKENS`). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
+- **MTP (Multi-Token Prediction):** the checkpoint ships one MTP layer (`mtp.layers.0`, 15 tensors in the weight index); vLLM 0.29.0 resolves it to the built-in `Qwen3_5MTP` draft model, so no separate draft checkpoint is needed. The entrypoint default is 3 speculative tokens per step (override with `MTP_NUM_SPECULATIVE_TOKENS`). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
+- **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` field in each response: `none` omits it; `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`; vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.1 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on host port `1235` (mapped from internal port 8000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
@@ -246,9 +250,9 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ## Security posture
 
-Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); endpoint claims verified against the running server (vLLM v0.28.0).
+Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); endpoint claims verified against the running server (vLLM v0.29.0).
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in this version (and dev mode is never enabled).
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in this version (and dev mode is never enabled).
 
 **Controls (nginx, HTTPS path):**
 
@@ -259,7 +263,7 @@ Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/s
 | Body-size cap | `client_max_body_size 4m` | the full 116k-token context fits with margin; bounds abuse |
 | TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
 
-**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, the tokenizer-info endpoint, profilers, gRPC, LoRA runtime loading and endpoint plugins are all off by default in this entrypoint.
+**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, the tokenizer-info endpoint, profilers, gRPC, LoRA runtime loading and endpoint plugins are all off by default in this entrypoint. Admission control (`--max-num-queued-reqs` / `--max-num-queued-tokens`, defaults `4` / `128K`) caps in-flight requests and queued prefill tokens server-side; overflow returns HTTP `503` from the engine as a backstop under the nginx rate limit.
 
 **Residual risks:**
 

@@ -190,6 +190,8 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
+| `MAX_NUM_QUEUED_REQS` | `4` | Admission cap: max in-flight requests (waiting + running); `4` = `4× MAX_NUM_SEQS`. Overflow → HTTP `503` |
+| `MAX_NUM_QUEUED_TOKENS` | `128K` | Admission cap: max queued prefill tokens counted conservatively (prefix-cache hits are not subtracted); `128K` spans the full single-prompt context, so a long prompt up to `MAX_MODEL_LEN` is admitted. Overflow → HTTP `503` |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type (`fp8_e4m3` to halve KV footprint) |
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
 | `PERFORMANCE_MODE` | `interactivity` | vLLM performance mode |
@@ -200,6 +202,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `SPEC_METHOD` | `dflash` | Speculative decoding method |
 | `SPEC_MODEL` | `meta-models/Muse-Glimmer-30B-assistant` | DFlash draft head |
 | `SPEC_NUM_TOKENS` | `15` | Speculative tokens per step |
+| `PER_REQUEST_SPEC_DECODE_METRICS` | `none` | Per-request spec-decode acceptance metrics in the response (`metrics.speculative_decoding`): `none` off \| `summary` \| `detailed` |
 
 ### Optional: vLLM-Copilot budget
 
@@ -238,7 +241,7 @@ Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
 | Variable | Default | Description |
 |---|---|---|
 | `SAFETENSORS_LOAD_STRATEGY` | `prefetch` | Weight loading strategy |
-| `VLLM_USE_V2_MODEL_RUNNER` | `1` | **Hardcoded in `docker-compose.yml`** (not a pass-through): Muse Glimmer is dense non-hybrid, V2 is default on vLLM 0.28; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` enables UVA on WSL2 |
+| `VLLM_USE_V2_MODEL_RUNNER` | `1` | **Hardcoded in `docker-compose.yml`** (not a pass-through): the V2 model runner is the GA default on vLLM 0.29; pinned to `1` — one-line rollback to the V1 runner: `0`; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` enables the V2 UVA path on the target WSL2 platform |
 | `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `1` | Estimate CUDA-graph memory in the profiler (on) |
 | `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/tmp/flashinfer_autotune_cache` | FlashInfer autotune cache location |
 | `NVIDIA_VISIBLE_DEVICES` | `all` | GPU passthrough |
@@ -253,9 +256,9 @@ Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
 
 ## Security posture
 
-Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); the unauthenticated-endpoint claims below were probed live on the qwen stack (same vLLM v0.28.0) — this stack shares the identical nginx control set.
+Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); the unauthenticated-endpoint claims below were probed live on the qwen stack (same vLLM v0.29.0) — this stack shares the identical nginx control set.
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.28.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
 
 **Controls (nginx, HTTPS path):**
 
@@ -266,7 +269,7 @@ Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/s
 | Body-size cap | `client_max_body_size 4m` | the full 128k-token context fits with margin; bounds abuse |
 | TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
 
-**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, profilers, gRPC and endpoint plugins are off by default in this entrypoint.
+**Controls (vLLM):** `VLLM_MAX_N_SEQUENCES=16` caps the `n` parameter (vLLM default 16384). Dev-mode endpoints, profilers, gRPC and endpoint plugins are off by default in this entrypoint. Admission control (`--max-num-queued-reqs` / `--max-num-queued-tokens`, defaults `4` / `128K`) caps in-flight requests and queued prefill tokens server-side; overflow returns HTTP `503` from the engine as a backstop under the nginx rate limit.
 
 **Residual risks:**
 
@@ -275,10 +278,12 @@ Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/s
 
 ## Notes
 
-- **vLLM image:** the deployment builds on `vllm/vllm-openai:v0.28.0` (pinned numeric tag, same pattern as the other stacks). v0.28.0 is the first plain release with the native `muse_glimmer` tool-call parser and first-class configs; `v0.27.1` contains none of them and fails at boot (`KeyError: invalid tool call parser: muse_glimmer`). Do not downgrade to a numeric tag below 0.28.0.
+- **vLLM image:** the deployment builds on `vllm/vllm-openai:v0.29.0` (pinned numeric tag, same pattern as the other stacks). v0.28.0 is the first plain release with the native `muse_glimmer` tool-call parser and first-class configs; `v0.27.1` contains none of them and fails at boot (`KeyError: invalid tool call parser: muse_glimmer`). Do not downgrade to a numeric tag below 0.28.0.
+- **`MAX_MODEL_LEN`:** the live `.env` sets `MAX_MODEL_LEN=auto` (the `.env.example` ships `131072`); the effective context is whatever fits the KV pool budget at boot — confirm the resolved value in the boot log.
 - **`--generation-config auto`:** if the image rejects the flag on startup, remove the `GENERATION_CONFIG` block from `entrypoint.sh` and rebuild — sampling then comes from the request payloads. Do **not** run the model greedy either way.
 - **Coexistence with the Qwen deployment:** the two stacks run side by side — separate compose project names, containers (`vllm-museglimmer-server` vs `vllm-qwen-server`), host ports (`1236` vs `1235`), HF cache and API-key volumes.
 - **Speculative decoding (DFlash):** off by default — the 5.1 GB draft head (`meta-models/Muse-Glimmer-30B-assistant`, 15 tokens/step) OOMs on a single RTX 5090 (~400 MiB headroom). On a 2x setup with `TP_SIZE=2` the recipe measured ~240 tok/s decode (~3.5x). Enable via `ENABLE_SPEC_DECODING=true` only in that configuration.
+- **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` response field: `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`. vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled — DFlash is off by default in this stack, so the variable must stay `none` unless spec decoding is enabled.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.92` on 32 GB, consumption is ~28.8 GB (recipe, model + full 128K KV pool at ~179,647 tokens).
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
 - **Port:** the API is exposed on host port `1236` (mapped from internal port 8000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
