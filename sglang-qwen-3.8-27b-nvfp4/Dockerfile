@@ -1,4 +1,4 @@
-FROM lmsysorg/sglang:nightly-dev-cu13-20260908-20ca564b
+FROM lmsysorg/sglang:v0.5.19
 
 # Needed for packages that require localization.
 ENV DEBIAN_FRONTEND=noninteractive
