@@ -203,6 +203,22 @@ Recommended model entry (`sglang/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090`)
 
 **Trade-off:** omitting the 65536 pick removes one-shot very long generation. To get it back, raise `MEM_FRACTION_STATIC` to 0.90 — on the WDDM/WSL2 target platform 0.90 causes UVM spill, 0.85 avoids it — or accept that a second concurrent request waits for KV release.
 
+### Template kwargs (per-request)
+
+The model's chat template accepts these kwargs in the `chat_template_kwargs` field of the `/v1/chat/completions` request body. This stack's entrypoint sets no server-side defaults, so the template defaults (column 2) apply unless the client sends kwargs.
+
+| Kwargs | Default | Effect |
+|---|---|---|
+| `reasoning_effort` | `xhigh` | `xhigh` / `medium` / `low`. xhigh is the cheapest at equal accuracy (245 vs 584 reasoning tokens at 12/12 on the card's validation set). Invalid values raise. |
+| `enable_thinking` | `true` | `false` emits a closed, empty think block — use for short answers |
+| `preserve_thinking` | `true` | Keeps reasoning in history; `false` is prefix-cache safe. For this stack's mamba prefix-cache (align blocks of 1600 tokens) keep it `false` so the prompt prefix stays stable across turns and multi-turn TTFT is preserved |
+| `tool_call_format` | `xml` | `json` switches to `{"name": ..., "arguments": {...}}` |
+| `continue_final_message` | `false` | Prefills the final assistant turn; takes precedence over `add_generation_prompt` |
+| `auto_disable_thinking_with_tools` | `false` | Turns thinking off when tools are present |
+| `max_tool_arg_chars` / `max_tool_response_chars` | `0` | Opt-in truncation of tool args / tool responses; `0` = off |
+
+`system` and `developer` roles are both accepted, and consecutive tool responses are grouped into a single turn.
+
 ### Behavior & features
 
 | Variable | Default | Description |
