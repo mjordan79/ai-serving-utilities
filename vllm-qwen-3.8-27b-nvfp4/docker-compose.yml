@@ -35,12 +35,12 @@ services:
 
       # WSL2 only: Enables non-blocking per-step host -> device
       # staging of attention metadata. Also required for UVA / V2 model runner.
-      - VLLM_WSL2_ENABLE_PIN_MEMORY=1
+      - VLLM_WSL2_ENABLE_PIN_MEMORY=0
 
       # V2 model runner is the GA default on vLLM 0.29 (no pin needed); the
       # VLLM_WSL2_ENABLE_PIN_MEMORY=1 above enables its UVA path on WSL2. One-line
       # fallback if boot or the first request fails: add `- VLLM_USE_V2_MODEL_RUNNER=0`.
-
+      - VLLM_USE_V2_MODEL_RUNNER=0
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - MODEL_NAME

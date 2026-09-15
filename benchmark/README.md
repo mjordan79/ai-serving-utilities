@@ -6,13 +6,13 @@ by Renato Perini (mjordan79)
 
 Curl-based benchmark suite for vLLM deployments. No Python, no external dependencies beyond `bash`, `curl`, `gawk`, `date`.
 
-The suite is **model-agnostic**: it lives at the workspace root (outside any model directory) and targets any supported deployment — selected positionally at invocation time (default `qwen`).
+The suite is **model-agnostic**: it lives at the workspace root (outside any model directory) and targets any supported deployment -- selected positionally at invocation time (default `qwen`).
 
 ## Structure
 
 ```
 benchmark/
-├── run.sh              # Master runner — auto-detects config from the selected model's .env
+├── run.sh              # Master runner -- auto-detects config from the selected model's .env
 ├── compare.sh          # Side-by-side comparison of two runs
 ├── warmup.sh           # Triton kernel pre-compilation warmup
 ├── lib.sh              # Shared library (curl wrapper, metrics, reporting)
@@ -25,7 +25,7 @@ benchmark/
 │   ├── 06_long_output.sh        # Long output (up to 4096 tokens)
 │   ├── 07_multi_turn.sh         # Multi-turn conversation (3 turns)
 │   └── 08_mixed_workload.sh     # Mixed task types (Q&A, code, reasoning, translation)
-└── results/                # gitignored — raw data and generated reports
+└── results/                # gitignored -- raw data and generated reports
     ├── <model_label>/
     │   ├── results_YYYYMMDD_HHMMSS.tsv   # Raw TSV data
     │   └── report_YYYYMMDD_HHMMSS.md     # Markdown report
@@ -49,14 +49,14 @@ The model is selected as the first positional argument (default `qwen`):
 | `sglang` | `sglang-qwen-3.8-27b-nvfp4/` | `sglang-qwen-server` | 1238 |
 | `gemma4` | `vllm-gemma-4-26b-a4b-nvfp4/` | `vllm-gemma4-server` | 1239 |
 
-The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR` / `MODEL_SGLANG_DIR` / `MODEL_NEMOTRON_DIR` / `MODEL_GEMMA4_DIR`) — renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
+The mapping lives in `lib.sh` (`MODEL_QWEN_DIR` / `MODEL_MUSE_DIR` / `MODEL_SGLANG_DIR` / `MODEL_NEMOTRON_DIR` / `MODEL_GEMMA4_DIR`) -- renaming a deployment directory only requires updating that table. The host port and container name are parsed from the selected model's `docker-compose.yml`, and all other variables come from its `.env`:
 
 | .env Variable | Auto-Derived | Used For |
 |---------------|--------------|----------|
-| `LETSENCRYPT_DOMAIN` | → `BASE_URL` | `https://<domain>` if the domain resolves, else `http://localhost:<port>` (port from the model's compose) |
-| *(docker → .env)* | → `API_KEY` | Recovered live from the running container via `docker exec <container>` / `docker compose exec`; if docker is unreachable (e.g. WSL without interop), falls back to `VLLM_API_KEY` from the model's `.env`, then an interactive prompt |
-| `MODEL_NAME` | → `MODEL_LABEL` | Result directory naming |
-| `QUANTIZATION` | → `MODEL_LABEL` | Appended to model label (e.g., `unsloth/Qwen3.8-27B-NVFP4 (compressed-tensors)`) |
+| `LETSENCRYPT_DOMAIN` | -> `BASE_URL` | `https://<domain>` if the domain resolves, else `http://localhost:<port>` (port from the model's compose) |
+| *(docker -> .env)* | -> `API_KEY` | Recovered live from the running container via `docker exec <container>` / `docker compose exec`; if docker is unreachable (e.g. WSL without interop), falls back to `VLLM_API_KEY` from the model's `.env`, then an interactive prompt |
+| `MODEL_NAME` | -> `MODEL_LABEL` | Result directory naming |
+| `QUANTIZATION` | -> `MODEL_LABEL` | Appended to model label (e.g., `unsloth/Qwen3.8-27B-NVFP4 (compressed-tensors)`) |
 
 No manual config files needed. The scripts read the model deployment state directly.
 
@@ -67,11 +67,11 @@ No manual config files needed. The scripts read the model deployment state direc
 - `gawk` (uses the gawk-only `asorti` in `run.sh` and `compare.sh`; plain `mawk`/`awk` will not work)
 - `date` with `%N` support (nanoseconds)
 
-No `jq` required — all JSON parsing is handled via `gawk`/`sed`.
+No `jq` required -- all JSON parsing is handled via `gawk`/`sed`.
 
 ## Usage
 
-> Scripts are committed without the executable bit (Windows convention) — invoke with `bash`.
+> Scripts are committed without the executable bit (Windows convention) -- invoke with `bash`.
 
 ### 1. Warmup (required before benchmarking)
 
@@ -115,7 +115,7 @@ bash run.sh 01_simple_chat
 bash compare.sh 'results/unsloth_Qwen3-8-27B-NVFP4-(compressed-tensors)' 'results/RedHatAI-Muse-Glimmer-30B-NVFP4-(compressed-tensors)'
 ```
 
-Directory names are produced by `run.sh` from `MODEL_NAME + " (${QUANTIZATION})"` sanitized via `tr` (`/` → `_`, `.` → `-`, space → `-`). The markdown report is written to `results/comparison/`.
+Directory names are produced by `run.sh` from `MODEL_NAME + " (${QUANTIZATION})"` sanitized via `tr` (`/` -> `_`, `.` -> `-`, space -> `-`). The markdown report is written to `results/comparison/`.
 
 ## Metrics
 
@@ -124,8 +124,8 @@ Directory names are produced by `run.sh` from `MODEL_NAME + " (${QUANTIZATION})"
 | **TTFT** | Time To First Token (ms) | Lower |
 | **Total** | End-to-end latency (ms) | Lower |
 | **TPS** | Tokens Per Second | Higher |
-| **InTok** | Input/prompt tokens | — |
-| **OutTok** | Output/completion tokens | — |
+| **InTok** | Input/prompt tokens | -- |
+| **OutTok** | Output/completion tokens | -- |
 
 ## Test Matrix
 
@@ -137,7 +137,7 @@ Directory names are produced by `run.sh` from `MODEL_NAME + " (${QUANTIZATION})"
 | `reasoning` | ~40 tok | ~500 tok | Thinking | CoT/reasoning path |
 | `tool_calling` | ~100 tok | ~30 tok | Tools | Function calling overhead |
 | `long_output` | ~80 tok | ~2000 tok | Long decode | Sustained generation TPS |
-| `multi_turn` | 15→100→200 tok | ~100 tok/turn | Growing context | Context window scaling |
+| `multi_turn` | 15->100->200 tok | ~100 tok/turn | Growing context | Context window scaling |
 | `mixed_workload` | varies | varies | All | Realistic mixed pattern |
 
 ## Output Format
@@ -156,7 +156,7 @@ simple_chat    3    15    51    241    1820    28.02
 - Concurrency differs by target: qwen, muse and gemma4 run with `MAX_NUM_SEQS=1` (one concurrent request), nemotron with `MAX_NUM_SEQS=8`, and the sglang target with `MAX_RUNNING_REQUESTS=2`. The suite issues requests sequentially; TPS across targets is comparable only within the same concurrency regime.
 - Run both deployments (qwen vs muse) on the **same hardware, same load** for a fair comparison.
 - GPU temperature affects performance. Let the system stabilize between runs.
-- The warmup script is not optional — Triton kernel compilation on first use adds significant latency.
+- The warmup script is not optional -- Triton kernel compilation on first use adds significant latency.
 
 ### vLLM v0.28.0 Specifics
 
@@ -184,7 +184,7 @@ ways that the suite handles automatically in `lib.sh` (`run_chat_stream`):
 
 ### JSON Parsing (No jq)
 
-All JSON parsing uses `gawk`/`sed` — no external tools required. When constructing payloads with `printf`:
+All JSON parsing uses `gawk`/`sed` -- no external tools required. When constructing payloads with `printf`:
 
 ```bash
 # CORRECT: \\n produces escaped newline in JSON

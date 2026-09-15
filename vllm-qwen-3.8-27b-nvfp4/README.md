@@ -1,24 +1,24 @@
-# Qwen 27B NVFP4 — vLLM Server
+# Qwen 27B NVFP4 -- vLLM Server
 
 ![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Alibaba Cloud](https://img.shields.io/badge/Alibaba%20Cloud-FF6A00?style=for-the-badge&logo=alibabacloud&logoColor=white) ![vLLM](https://img.shields.io/badge/vLLM-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 Docker Compose deployment for Qwen 27B NVFP4 on vLLM (OpenAI-compatible API). The same deployment serves two HuggingFace checkpoints, selected in `.env`:
 
-- **Unsloth** — `unsloth/Qwen3.8-27B-NVFP4`, NVFP4 via Compressed-Tensors (default)
-- **NVIDIA** — `nvidia/Qwen3.6-27B-NVFP4`, NVFP4 via ModelOpt
+- **Unsloth** -- `unsloth/Qwen3.8-27B-NVFP4`, NVFP4 via Compressed-Tensors (default)
+- **NVIDIA** -- `nvidia/Qwen3.6-27B-NVFP4`, NVFP4 via ModelOpt
 
 by Renato Perini (mjordan79)
 
 ## Prerequisites
 
-- **NVIDIA GPU** with CUDA drivers (tested on Geforce RTX 5090 — 32 GB VRAM)
+- **NVIDIA GPU** with CUDA drivers (tested on Geforce RTX 5090 -- 32 GB VRAM)
 - **NVIDIA Container Toolkit** (natively or on WSL) installed (`nvidia-container-toolkit`)
 - **Docker** + **Docker Compose**
-- **HuggingFace token** for the selected checkpoint (`.env` → `MODEL_NAME`)
+- **HuggingFace token** for the selected checkpoint (`.env` -> `MODEL_NAME`)
 
 ### For remote access via HTTPS (optional)
 
-- **DuckDNS account** with a subdomain (e.g., `your-domain.duckdns.org`) — free, up to 5 subdomains
+- **DuckDNS account** with a subdomain (e.g., `your-domain.duckdns.org`) -- free, up to 5 subdomains
 - **Ports 80 and 443** forwarded from your router to the Docker host
 - DuckDNS subdomain pointing to your public IP (update at [duckdns.org](https://www.duckdns.org))
 
@@ -31,13 +31,13 @@ Create a `.env` file in the same directory as `docker-compose.yml`:
 ```env
 HF_TOKEN=hf_your_token_here
 
-# Variant: Unsloth — NVFP4 via Compressed-Tensors (default)
+# Variant: Unsloth -- NVFP4 via Compressed-Tensors (default)
 MODEL_NAME=unsloth/Qwen3.8-27B-NVFP4
 QUANTIZATION=compressed-tensors
 HF_CACHE_VOLUME=hf-cache-unsloth
 MAX_MODEL_LEN=116800
 
-# Variant: NVIDIA — NVFP4 via ModelOpt (comment the block above to use this)
+# Variant: NVIDIA -- NVFP4 via ModelOpt (comment the block above to use this)
 #MODEL_NAME=nvidia/Qwen3.6-27B-NVFP4
 #QUANTIZATION=modelopt
 #HF_CACHE_VOLUME=hf-cache-nvidia
@@ -56,7 +56,7 @@ LETSENCRYPT_EMAIL=you@example.com
 
 To pin a fixed API key (optional) instead of the auto-generated one, add `VLLM_API_KEY=sk-...` to `.env` (documented in `.env.example`). Keep the value in the gitignored `.env`, never in compose.
 
-> `.env` is listed in `.gitignore` — never commit it.
+> `.env` is listed in `.gitignore` -- never commit it.
 
 ### 2. Build and start
 
@@ -76,9 +76,9 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
 ```
 
 This starts additional containers:
-- **docker-gen** — required by acme-companion (watches Docker events, no-op template)
-- **nginx** — vanilla reverse proxy on ports 80/443 with SSL hardening; generates a self-signed placeholder on first boot, then symlinks to the Let's Encrypt cert once issued
-- **acme-companion** — auto-provisions and renews a free Let's Encrypt certificate for `LETSENCRYPT_DOMAIN`
+- **docker-gen** -- required by acme-companion (watches Docker events, no-op template)
+- **nginx** -- vanilla reverse proxy on ports 80/443 with SSL hardening; generates a self-signed placeholder on first boot, then symlinks to the Let's Encrypt cert once issued
+- **acme-companion** -- auto-provisions and renews a free Let's Encrypt certificate for `LETSENCRYPT_DOMAIN`
 
 On the first run, certificate issuance takes ~2 minutes. Check progress:
 
@@ -100,7 +100,7 @@ API authentication is **enabled by default** (`ENABLE_API_KEY=true`). On the fir
 docker compose logs | grep "Generated API key"
 ```
 
-Save this value — it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
+Save this value -- it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
 
 ```bash
 docker exec vllm-qwen-server cat /root/.vllm-key/.api_key
@@ -162,12 +162,12 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 | Variable | Default | Description |
 |---|---|---|
-| `MODEL_NAME` | `unsloth/Qwen3.8-27B-NVFP4` | HuggingFace model name — set per variant in `.env` |
-| `QUANTIZATION` | `compressed-tensors` | Quantization backend — `modelopt` for the NVIDIA variant |
-| `HF_CACHE_VOLUME` | `hf-cache-unsloth` | Named volume for the HF cache — one per variant |
-| `MAX_MODEL_LEN` | `116800` | Maximum context length — set per variant in `.env` (NVIDIA: `131072`, Unsloth: `116800`) |
+| `MODEL_NAME` | `unsloth/Qwen3.8-27B-NVFP4` | HuggingFace model name -- set per variant in `.env` |
+| `QUANTIZATION` | `compressed-tensors` | Quantization backend -- `modelopt` for the NVIDIA variant |
+| `HF_CACHE_VOLUME` | `hf-cache-unsloth` | Named volume for the HF cache -- one per variant |
+| `MAX_MODEL_LEN` | `116800` | Maximum context length -- set per variant in `.env` (NVIDIA: `131072`, Unsloth: `116800`) |
 | `DTYPE` | `auto` | Data type for model weights |
-| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Qwen3.8 is a built-in vLLM architecture and the compressed-tensors format is handled natively — no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
+| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Qwen3.8 is a built-in vLLM architecture and the compressed-tensors format is handled natively -- no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `SKIP_MM_PROFILING` | `true` | Skip multimodal profiling at startup |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
@@ -176,11 +176,11 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
-| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
+| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0-1.0) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
-| `MAX_NUM_QUEUED_REQS` | `4` | Admission cap: max in-flight requests (waiting + running); `4` = `4× MAX_NUM_SEQS`. Overflow → HTTP `503` |
-| `MAX_NUM_QUEUED_TOKENS` | `128K` | Admission cap: max queued prefill tokens counted conservatively (prefix-cache hits are not subtracted); `128K` spans the full single-prompt context, so a long prompt up to `MAX_MODEL_LEN` is admitted. Overflow → HTTP `503` |
+| `MAX_NUM_QUEUED_REQS` | `4` | Admission cap: max in-flight requests (waiting + running); `4` = `4x MAX_NUM_SEQS`. Overflow -> HTTP `503` |
+| `MAX_NUM_QUEUED_TOKENS` | `128K` | Admission cap: max queued prefill tokens counted conservatively (prefix-cache hits are not subtracted); `128K` spans the full single-prompt context, so a long prompt up to `MAX_MODEL_LEN` is admitted. Overflow -> HTTP `503` |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
 | `PERFORMANCE_MODE` | `interactivity` | vLLM performance mode |
@@ -195,7 +195,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 | Variable | Default | Description |
 |---|---|---|
-| `LANGUAGE_MODEL_ONLY` | `true` | Entrypoint default: when unset (or not `false`), vLLM starts with `--language-model-only` (skips the multimodal stack — this model is text-only, so this is the lighter startup). To keep the full server path, set `LANGUAGE_MODEL_ONLY=false` in `docker-compose.yml` |
+| `LANGUAGE_MODEL_ONLY` | `true` | Entrypoint default: when unset (or not `false`), vLLM starts with `--language-model-only` (skips the multimodal stack -- this model is text-only, so this is the lighter startup). To keep the full server path, set `LANGUAGE_MODEL_ONLY=false` in `docker-compose.yml` |
 | `REASONING_PARSER` | `qwen3` | Parser that splits reasoning content from the response |
 | `DEFAULT_ENABLE_THINKING` | `true` | Server-side default for `enable_thinking` (per-request `chat_template_kwargs` overrides it) |
 | `DEFAULT_PRESERVE_THINKING` | `true` | Keep historical assistant thinking in multi-turn context; `false` strips it to save context (inert unless the client echoes reasoning back) |
@@ -208,7 +208,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 |---|---|---|
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
 | `VLLM_MAX_N_SEQUENCES` | `16` | Cap on the `n` parameter per `/v1` request (vLLM default 16384) |
-| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored — the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
+| `VLLM_API_KEY` | *(empty -> auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored -- the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
 | `DISABLE_LOG_STATS` | `false` | Disable periodic vLLM throughput statistics; requires `ENABLE_REQUEST_METRICS=false` |
 | `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Detailed prompt-token breakdown in usage |
@@ -239,12 +239,12 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 - **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` field in each response: `none` omits it; `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`; vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.1 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
-- **Port:** the API is exposed on host port `1235` (mapped from internal port 8000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
+- **Port:** the API is exposed on host port `1235` (mapped from internal port 8000), bound to `0.0.0.0` by default -- reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
 - **Reverse Proxy:** two modes via overlay:
-  - **Direct** (default): `docker compose up -d` → API on port `1235` (HTTP, LAN-reachable, Bearer-authenticated)
-  - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
-  - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
-  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1235:8000` publish (Compose merges lists; an empty list is a no-op). Verified on the running container: port `1235` stays published on the host even in proxy mode. nginx only guards the public 80/443 path — LAN hosts can still reach vLLM directly on 1235, bypassing the nginx allowlist (see Security posture).
+  - **Direct** (default): `docker compose up -d` -> API on port `1235` (HTTP, LAN-reachable, Bearer-authenticated)
+  - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` -> API on `https://<domain>` (HTTPS, remote)
+  - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime -- never hardcoded in config files.
+  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1235:8000` publish (Compose merges lists; an empty list is a no-op). Verified on the running container: port `1235` stays published on the host even in proxy mode. nginx only guards the public 80/443 path -- LAN hosts can still reach vLLM directly on 1235, bypassing the nginx allowlist (see Security posture).
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 
@@ -252,13 +252,13 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); endpoint claims verified against the running server (vLLM v0.29.0).
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in this version (and dev mode is never enabled).
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in this version (and dev mode is never enabled).
 
 **Controls (nginx, HTTPS path):**
 
 | Control | Value | Purpose |
 |---|---|---|
-| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else → `404` | blocks every unauthenticated endpoint above; endpoints added by future vLLM releases stay blocked by default |
+| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else -> `404` | blocks every unauthenticated endpoint above; endpoints added by future vLLM releases stay blocked by default |
 | Rate limit | 10 req/s per IP, burst 20, then `503` | bounds abuse and queue-flooding |
 | Body-size cap | `client_max_body_size 4m` | the full 116k-token context fits with margin; bounds abuse |
 | TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
@@ -267,13 +267,13 @@ Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/s
 
 **Residual risks:**
 
-- Port `1235` stays published on the host in proxy mode (see limitation above) — LAN-only exposure. `/v1/*` is Bearer-authenticated, but the unauthenticated endpoints listed above are reachable on 1235 with no nginx in front.
+- Port `1235` stays published on the host in proxy mode (see limitation above) -- LAN-only exposure. `/v1/*` is Bearer-authenticated, but the unauthenticated endpoints listed above are reachable on 1235 with no nginx in front.
 - `TRUST_REMOTE_CODE` defaults to `false`: Qwen3.8 loads through vLLM's built-in architecture registry and its NVFP4 weights are consumed natively via `compressed-tensors`, so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint starts failing with a custom-code / `auto_map` load error; with `true` the flag becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Useful Commands
 
 ```bash
-# Start (direct mode — HTTP on port 1235, bound to 0.0.0.0)
+# Start (direct mode -- HTTP on port 1235, bound to 0.0.0.0)
 docker compose up -d
 
 # Start with HTTPS proxy (remote access via DuckDNS)

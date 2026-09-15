@@ -1,8 +1,8 @@
-# Muse Glimmer 30B NVFP4 — vLLM Server
+# Muse Glimmer 30B NVFP4 -- vLLM Server
 
 ![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Red Hat AI](https://img.shields.io/badge/Red%20Hat%20AI-000000?style=for-the-badge&logo=redhat&logoColor=EE0000) ![vLLM](https://img.shields.io/badge/vLLM-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
-Docker Compose deployment for [RedHatAI/Muse-Glimmer-30B-NVFP4](https://huggingface.co/RedHatAI/Muse-Glimmer-30B-NVFP4) on vLLM (OpenAI-compatible API) — a dense 29.6B multimodal model (52 layers, 128K context, Apache 2.0) with a ViT-G/14 vision encoder, NVFP4-quantized weights (group-16, Compressed-Tensors format; vision tower and embeddings stay in BF16).
+Docker Compose deployment for [RedHatAI/Muse-Glimmer-30B-NVFP4](https://huggingface.co/RedHatAI/Muse-Glimmer-30B-NVFP4) on vLLM (OpenAI-compatible API) -- a dense 29.6B multimodal model (52 layers, 128K context, Apache 2.0) with a ViT-G/14 vision encoder, NVFP4-quantized weights (group-16, Compressed-Tensors format; vision tower and embeddings stay in BF16).
 
 by Renato Perini (mjordan79)
 
@@ -10,8 +10,8 @@ by Renato Perini (mjordan79)
 
 Muse Glimmer does **not** use JSON tool calls or `think` tags. Its output is **channel-scoped**:
 
-- `to=self` — internal reasoning channel
-- `to=user` — the final answer channel
+- `to=self` -- internal reasoning channel
+- `to=user` -- the final answer channel
 - ATEM XML blocks for tool calls
 
 The vLLM `muse_glimmer` reasoning and tool-call parsers (native since vLLM 0.27.0) decode these channels and map them onto the standard `reasoning` / `content` / `tool_calls` response fields. Two consequences:
@@ -29,14 +29,14 @@ There is no `enable_thinking` flag and no `chat_template_kwargs` knob for this m
 
 ## Prerequisites
 
-- **NVIDIA GPU** with CUDA drivers (tested on GeForce RTX 5090 — 32 GB VRAM, `TP_SIZE=1`)
+- **NVIDIA GPU** with CUDA drivers (tested on GeForce RTX 5090 -- 32 GB VRAM, `TP_SIZE=1`)
 - **NVIDIA Container Toolkit** (natively or on WSL) installed (`nvidia-container-toolkit`)
 - **Docker** + **Docker Compose**
 - **HuggingFace token** for `RedHatAI/Muse-Glimmer-30B-NVFP4`
 
 ### For remote access via HTTPS (optional)
 
-- **DuckDNS account** with a subdomain (e.g., `your-domain.duckdns.org`) — free, up to 5 subdomains
+- **DuckDNS account** with a subdomain (e.g., `your-domain.duckdns.org`) -- free, up to 5 subdomains
 - **Ports 80 and 443** forwarded from your router to the Docker host
 - DuckDNS subdomain pointing to your public IP (update at [duckdns.org](https://www.duckdns.org))
 
@@ -65,7 +65,7 @@ LETSENCRYPT_EMAIL=you@example.com
 
 To pin a fixed API key (optional) instead of the auto-generated one, add `VLLM_API_KEY=sk-...` to `.env` (documented in `.env.example`). Keep the value in the gitignored `.env`, never in compose.
 
-> `.env` is listed in `.gitignore` — never commit it.
+> `.env` is listed in `.gitignore` -- never commit it.
 
 ### 2. Build and start
 
@@ -91,9 +91,9 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
 ```
 
 This starts additional containers:
-- **muse-docker-gen** — required by acme-companion (watches Docker events, no-op template)
-- **muse-nginx** — vanilla reverse proxy on ports 80/443 with SSL hardening; generates a self-signed placeholder on first boot, then symlinks to the Let's Encrypt cert once issued
-- **muse-acme** — auto-provisions and renews a free Let's Encrypt certificate for `LETSENCRYPT_DOMAIN`
+- **muse-docker-gen** -- required by acme-companion (watches Docker events, no-op template)
+- **muse-nginx** -- vanilla reverse proxy on ports 80/443 with SSL hardening; generates a self-signed placeholder on first boot, then symlinks to the Let's Encrypt cert once issued
+- **muse-acme** -- auto-provisions and renews a free Let's Encrypt certificate for `LETSENCRYPT_DOMAIN`
 
 On the first run, certificate issuance takes ~2 minutes. Check progress:
 
@@ -115,7 +115,7 @@ API authentication is **enabled by default** (`ENABLE_API_KEY=true`). On the fir
 docker compose logs | grep "Generated API key"
 ```
 
-Save this value — it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
+Save this value -- it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
 
 ```bash
 docker exec vllm-museglimmer-server cat /root/.vllm-key/.api_key
@@ -162,7 +162,7 @@ curl http://localhost:1236/v1/chat/completions \
 
 > Use `-k` (insecure) on first boot before Let's Encrypt issues the cert (self-signed placeholder). Remove `-k` once the cert is active.
 >
-> **Images:** Muse Glimmer is a VLM — you can send `image_url` parts (base64 or URL) in message content alongside text.
+> **Images:** Muse Glimmer is a VLM -- you can send `image_url` parts (base64 or URL) in message content alongside text.
 >
 > **Tool calling:** pass the standard OpenAI `tools` array with `tool_choice: "auto"`. The `muse_glimmer` parser translates the model's ATEM XML blocks into `tool_calls`; the server must be started with `--enable-auto-tool-choice` (default here).
 
@@ -179,7 +179,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `HF_CACHE_VOLUME` | `hf-cache-museglimmer` | Named volume for the HF cache |
 | `MAX_MODEL_LEN` | `131072` | Maximum context length (128K) |
 | `DTYPE` | `auto` | Data type for model weights |
-| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Muse Glimmer is a built-in vLLM architecture and the NVFP4 checkpoint is handled natively via `compressed-tensors` — no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
+| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Muse Glimmer is a built-in vLLM architecture and the NVFP4 checkpoint is handled natively via `compressed-tensors` -- no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
 ### Performance
@@ -187,11 +187,11 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `TP_SIZE` | `1` | Tensor parallelism (1 = single GPU) |
-| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0–1.0) |
+| `GPU_MEMORY_UTILIZATION` | `0.94` | Fraction of usable VRAM (0.0-1.0) |
 | `MAX_NUM_SEQS` | `1` | Maximum concurrent sequences |
 | `MAX_NUM_BATCHED_TOKENS` | `6144` | Maximum tokens per prefill batch |
-| `MAX_NUM_QUEUED_REQS` | `4` | Admission cap: max in-flight requests (waiting + running); `4` = `4× MAX_NUM_SEQS`. Overflow → HTTP `503` |
-| `MAX_NUM_QUEUED_TOKENS` | `128K` | Admission cap: max queued prefill tokens counted conservatively (prefix-cache hits are not subtracted); `128K` spans the full single-prompt context, so a long prompt up to `MAX_MODEL_LEN` is admitted. Overflow → HTTP `503` |
+| `MAX_NUM_QUEUED_REQS` | `4` | Admission cap: max in-flight requests (waiting + running); `4` = `4x MAX_NUM_SEQS`. Overflow -> HTTP `503` |
+| `MAX_NUM_QUEUED_TOKENS` | `128K` | Admission cap: max queued prefill tokens counted conservatively (prefix-cache hits are not subtracted); `128K` spans the full single-prompt context, so a long prompt up to `MAX_MODEL_LEN` is admitted. Overflow -> HTTP `503` |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type (`fp8_e4m3` to halve KV footprint) |
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
 | `PERFORMANCE_MODE` | `interactivity` | vLLM performance mode |
@@ -206,14 +206,14 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ### Optional: vLLM-Copilot budget
 
-vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: a generous `maxOutputTokens` protects the final `to=user` channel from empty-content truncation, and an unset `maxInputTokens` keeps every prompt + `max_tokens` pair inside the 128K window.
+vLLM-Copilot is an **optional** VS Code client for this stack -- the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: a generous `maxOutputTokens` protects the final `to=user` channel from empty-content truncation, and an unset `maxInputTokens` keeps every prompt + `max_tokens` pair inside the 128K window.
 
 Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
 
 | Parameter | Value | Rationale |
 |---|---|---|
 | `maxOutputTokens` | `65536` | `MAX_MODEL_LEN=131072` gives 65536 output headroom at zero input. The cap must be generous (see *How this model answers*): a tight cap truncates the final `to=user` channel with an empty `content` field. |
-| `maxInputTokens` | *(unset)* | Auto-computed as `131072 − 65536 = 65536`. Do **not** pin it to a value above `MAX_MODEL_LEN − maxOutputTokens` (e.g. 100K): vLLM hard-rejects any request with `prompt + max_tokens > MAX_MODEL_LEN` with a 400 — an input claim of 100K is false on a 128K window. |
+| `maxInputTokens` | *(unset)* | Auto-computed as `131072 - 65536 = 65536`. Do **not** pin it to a value above `MAX_MODEL_LEN - maxOutputTokens` (e.g. 100K): vLLM hard-rejects any request with `prompt + max_tokens > MAX_MODEL_LEN` with a 400 -- an input claim of 100K is false on a 128K window. |
 | `defaultParams` | `{ temperature: 1.0, top_p: 0.95, top_k: 64 }` | Carries the checkpoint's tuned sampling (temp 1.0 / top_p 0.95 / top_k 64) on every request, per the model card. Without it the entry relies solely on the server's `--generation-config auto`; if that resolution changes, the model silently falls back to greedy. |
 
 ### Behavior & features
@@ -222,7 +222,7 @@ Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
 |---|---|---|
 | `REASONING_PARSER` | `muse_glimmer` | Parser that splits the `to=self` channel into `reasoning` (forces `skip_special_tokens=False`) |
 | `TOOL_CALL_PARSER` | `muse_glimmer` | Translates ATEM XML blocks into OpenAI `tool_calls` |
-| `GENERATION_CONFIG` | `auto` | Load the checkpoint's published generation config (temp 1.0 / top_p 0.95 / top_k 64) — see Notes |
+| `GENERATION_CONFIG` | `auto` | Load the checkpoint's published generation config (temp 1.0 / top_p 0.95 / top_k 64) -- see Notes |
 | `ENABLE_AUTO_TOOL_CHOICE` | `true` | Allow `tool_choice: "auto"` |
 
 ### API & server
@@ -230,7 +230,7 @@ Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
 | Variable | Default | Description |
 |---|---|---|
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
-| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored — the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
+| `VLLM_API_KEY` | *(empty -> auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored -- the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `ENABLE_REQUEST_METRICS` | `true` | Per-request metrics (profiling) |
 | `DISABLE_LOG_STATS` | `false` | Disable periodic vLLM throughput statistics; requires `ENABLE_REQUEST_METRICS=false` |
 | `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Detailed prompt-token breakdown in usage |
@@ -241,7 +241,7 @@ Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
 | Variable | Default | Description |
 |---|---|---|
 | `SAFETENSORS_LOAD_STRATEGY` | `prefetch` | Weight loading strategy |
-| `VLLM_USE_V2_MODEL_RUNNER` | `1` | **Hardcoded in `docker-compose.yml`** (not a pass-through): the V2 model runner is the GA default on vLLM 0.29; pinned to `1` — one-line rollback to the V1 runner: `0`; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` enables the V2 UVA path on the target WSL2 platform |
+| `VLLM_USE_V2_MODEL_RUNNER` | `1` | **Hardcoded in `docker-compose.yml`** (not a pass-through): the V2 model runner is the GA default on vLLM 0.29; pinned to `1` -- one-line rollback to the V1 runner: `0`; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` enables the V2 UVA path on the target WSL2 platform |
 | `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `1` | Estimate CUDA-graph memory in the profiler (on) |
 | `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/tmp/flashinfer_autotune_cache` | FlashInfer autotune cache location |
 | `NVIDIA_VISIBLE_DEVICES` | `all` | GPU passthrough |
@@ -256,15 +256,15 @@ Recommended model entry (`vllm/RedHatAI/Muse-Glimmer-30B-NVFP4`):
 
 ## Security posture
 
-Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); the unauthenticated-endpoint claims below were probed live on the qwen stack (same vLLM v0.29.0) — this stack shares the identical nginx control set.
+Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); the unauthenticated-endpoint claims below were probed live on the qwen stack (same vLLM v0.29.0) -- this stack shares the identical nginx control set.
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference — a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
 
 **Controls (nginx, HTTPS path):**
 
 | Control | Value | Purpose |
 |---|---|---|
-| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else → `404` | blocks every unauthenticated endpoint above; endpoints added by future vLLM releases stay blocked by default |
+| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else -> `404` | blocks every unauthenticated endpoint above; endpoints added by future vLLM releases stay blocked by default |
 | Rate limit | 10 req/s per IP, burst 20, then `503` | bounds abuse and queue-flooding |
 | Body-size cap | `client_max_body_size 4m` | the full 128k-token context fits with margin; bounds abuse |
 | TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
@@ -273,32 +273,32 @@ Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/s
 
 **Residual risks:**
 
-- Port `1236` stays published on the host in proxy mode (see known limitation above) — LAN-only exposure. The unauthenticated endpoints listed above are reachable on 1236 with no nginx in front.
+- Port `1236` stays published on the host in proxy mode (see known limitation above) -- LAN-only exposure. The unauthenticated endpoints listed above are reachable on 1236 with no nginx in front.
 - `TRUST_REMOTE_CODE` defaults to `false`: Muse Glimmer loads through vLLM's built-in architecture registry and its NVFP4 weights are consumed natively via `compressed-tensors`, so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint starts failing with a custom-code / `auto_map` load error; with `true` the flag becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Notes
 
 - **vLLM image:** the deployment builds on `vllm/vllm-openai:v0.29.0` (pinned numeric tag, same pattern as the other stacks). v0.28.0 is the first plain release with the native `muse_glimmer` tool-call parser and first-class configs; `v0.27.1` contains none of them and fails at boot (`KeyError: invalid tool call parser: muse_glimmer`). Do not downgrade to a numeric tag below 0.28.0.
-- **`MAX_MODEL_LEN`:** the live `.env` sets `MAX_MODEL_LEN=auto` (the `.env.example` ships `131072`); the effective context is whatever fits the KV pool budget at boot — confirm the resolved value in the boot log.
-- **`--generation-config auto`:** if the image rejects the flag on startup, remove the `GENERATION_CONFIG` block from `entrypoint.sh` and rebuild — sampling then comes from the request payloads. Do **not** run the model greedy either way.
-- **Coexistence with the Qwen deployment:** the two stacks run side by side — separate compose project names, containers (`vllm-museglimmer-server` vs `vllm-qwen-server`), host ports (`1236` vs `1235`), HF cache and API-key volumes.
-- **Speculative decoding (DFlash):** off by default — the 5.1 GB draft head (`meta-models/Muse-Glimmer-30B-assistant`, 15 tokens/step) OOMs on a single RTX 5090 (~400 MiB headroom). On a 2x setup with `TP_SIZE=2` the recipe measured ~240 tok/s decode (~3.5x). Enable via `ENABLE_SPEC_DECODING=true` only in that configuration.
-- **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` response field: `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`. vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled — DFlash is off by default in this stack, so the variable must stay `none` unless spec decoding is enabled.
+- **`MAX_MODEL_LEN`:** the live `.env` sets `MAX_MODEL_LEN=auto` (the `.env.example` ships `131072`); the effective context is whatever fits the KV pool budget at boot -- confirm the resolved value in the boot log.
+- **`--generation-config auto`:** if the image rejects the flag on startup, remove the `GENERATION_CONFIG` block from `entrypoint.sh` and rebuild -- sampling then comes from the request payloads. Do **not** run the model greedy either way.
+- **Coexistence with the Qwen deployment:** the two stacks run side by side -- separate compose project names, containers (`vllm-museglimmer-server` vs `vllm-qwen-server`), host ports (`1236` vs `1235`), HF cache and API-key volumes.
+- **Speculative decoding (DFlash):** off by default -- the 5.1 GB draft head (`meta-models/Muse-Glimmer-30B-assistant`, 15 tokens/step) OOMs on a single RTX 5090 (~400 MiB headroom). On a 2x setup with `TP_SIZE=2` the recipe measured ~240 tok/s decode (~3.5x). Enable via `ENABLE_SPEC_DECODING=true` only in that configuration.
+- **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` response field: `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`. vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled -- DFlash is off by default in this stack, so the variable must stay `none` unless spec decoding is enabled.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.92` on 32 GB, consumption is ~28.8 GB (recipe, model + full 128K KV pool at ~179,647 tokens).
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
-- **Port:** the API is exposed on host port `1236` (mapped from internal port 8000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
+- **Port:** the API is exposed on host port `1236` (mapped from internal port 8000), bound to `0.0.0.0` by default -- reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
 - **Reverse Proxy:** two modes via overlay:
-  - **Direct** (default): `docker compose up -d` → API on port `1236` (HTTP, LAN-reachable, Bearer-authenticated)
-  - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<domain>` (HTTPS, remote)
-  - The proxy overlay adds 3 containers: `muse-docker-gen`, `muse-nginx`, `muse-acme`. Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
-  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1236:8000` publish (Compose merges lists; an empty list is a no-op). Port `1236` stays published on the host even in proxy mode — LAN hosts can reach vLLM directly, bypassing the nginx allowlist (see Security posture).
+  - **Direct** (default): `docker compose up -d` -> API on port `1236` (HTTP, LAN-reachable, Bearer-authenticated)
+  - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` -> API on `https://<domain>` (HTTPS, remote)
+  - The proxy overlay adds 3 containers: `muse-docker-gen`, `muse-nginx`, `muse-acme`. Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime -- never hardcoded in config files.
+  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1236:8000` publish (Compose merges lists; an empty list is a no-op). Port `1236` stays published on the host even in proxy mode -- LAN hosts can reach vLLM directly, bypassing the nginx allowlist (see Security posture).
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `muse-acme` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 
 ## Useful Commands
 
 ```bash
-# Start (direct mode — HTTP on port 1236, bound to 0.0.0.0)
+# Start (direct mode -- HTTP on port 1236, bound to 0.0.0.0)
 docker compose up -d
 
 # Start with HTTPS proxy (remote access via DuckDNS)

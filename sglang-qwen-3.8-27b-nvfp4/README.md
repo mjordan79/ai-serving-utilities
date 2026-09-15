@@ -1,25 +1,25 @@
-# Qwen 27B NVFP4 — SGLang Server
+# Qwen 27B NVFP4 -- SGLang Server
 
 ![NVIDIA](https://img.shields.io/badge/NVIDIA-76B900?style=for-the-badge&logo=nvidia&logoColor=white) ![Alibaba Cloud](https://img.shields.io/badge/Alibaba%20Cloud-FF6A00?style=for-the-badge&logo=alibabacloud&logoColor=white) ![Gittensor](https://img.shields.io/badge/Gittensor-1F2937?style=for-the-badge) ![SGLang](https://img.shields.io/badge/SGLang-4B8BBE?style=for-the-badge&logo=python&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 Docker Compose deployment for Qwen 27B NVFP4 on SGLang (OpenAI-compatible API).
 
-- **Model** — `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (NVFP4, Mamba/hybrid attention)
-- **Image** — `lmsysorg/sglang:v0.5.19-cu130` (stable release, see *Notes*)
-- **Speculative decoding** — DSpark v2 drafter, enabled by default (set `SPECULATIVE_ALGORITHM=none` for full context)
+- **Model** -- `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (NVFP4, Mamba/hybrid attention)
+- **Image** -- `lmsysorg/sglang:v0.5.19-cu130` (stable release, see *Notes*)
+- **Speculative decoding** -- DSpark v2 drafter, enabled by default (set `SPECULATIVE_ALGORITHM=none` for full context)
 
 by Renato Perini (mjordan79)
 
 ## Prerequisites
 
-- **NVIDIA GPU** with CUDA drivers (tested on Geforce RTX 5090 — 32 GB VRAM)
+- **NVIDIA GPU** with CUDA drivers (tested on Geforce RTX 5090 -- 32 GB VRAM)
 - **NVIDIA Container Toolkit** (natively or on WSL) installed (`nvidia-container-toolkit`)
 - **Docker** + **Docker Compose**
-- **HuggingFace token** for `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (`.env` → `MODEL_NAME`)
+- **HuggingFace token** for `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (`.env` -> `MODEL_NAME`)
 
 ### For remote access via HTTPS (optional)
 
-- **DuckDNS account** with a subdomain (e.g., `your-domain.duckdns.org`) — free, up to 5 subdomains
+- **DuckDNS account** with a subdomain (e.g., `your-domain.duckdns.org`) -- free, up to 5 subdomains
 - **Ports 80 and 443** forwarded from your router to the Docker host
 - DuckDNS subdomain pointing to your public IP (update at [duckdns.org](https://www.duckdns.org))
 
@@ -48,7 +48,7 @@ For remote HTTPS access, the `LETSENCRYPT_DOMAIN` / `LETSENCRYPT_EMAIL` lines ar
 
 To pin a fixed API key (optional) instead of the auto-generated one, add `VLLM_API_KEY=sk-...` to `.env` (documented in `.env.example`). Keep the value in the gitignored `.env`, never in compose.
 
-> `.env` is listed in `.gitignore` — never commit it.
+> `.env` is listed in `.gitignore` -- never commit it.
 > The variable name is `VLLM_API_KEY` (not `SGLANG_API_KEY`) for **exact parity** with the sibling vLLM deployments; the `.env` convention is shared across the whole project.
 
 ### 2. Build and start
@@ -69,9 +69,9 @@ docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d
 ```
 
 This starts additional containers:
-- **docker-gen** — required by acme-companion (watches Docker events, no-op template)
-- **nginx** — vanilla reverse proxy on ports 80/443 with SSL hardening; generates a self-signed placeholder on first boot, then symlinks to the Let's Encrypt cert once issued
-- **acme-companion** — auto-provisions and renews a free Let's Encrypt certificate for `LETSENCRYPT_DOMAIN`
+- **docker-gen** -- required by acme-companion (watches Docker events, no-op template)
+- **nginx** -- vanilla reverse proxy on ports 80/443 with SSL hardening; generates a self-signed placeholder on first boot, then symlinks to the Let's Encrypt cert once issued
+- **acme-companion** -- auto-provisions and renews a free Let's Encrypt certificate for `LETSENCRYPT_DOMAIN`
 
 On the first run, certificate issuance takes ~2 minutes. Check progress:
 
@@ -83,7 +83,7 @@ Once the certificate is ready, access the API at `https://<your-domain.duckdns.o
 
 > **Without the proxy overlay**, the API is exposed directly on port `1238` (HTTP). Compose binds this port on `0.0.0.0` by default, so it is reachable from the LAN, not only localhost. It is Bearer-authenticated, but use the TLS proxy for anything non-local.
 >
-> **Port 80/443 conflict:** every proxy overlay in this repo binds the same host ports 80/443 — **only one proxy can run at a time** (this proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same domain). The direct-mode ports do not conflict (Qwen-vLLM `1235`, Muse `1236`, Nemotron `1237`, Qwen-SGLang `1238`, Gemma 4 `1239`).
+> **Port 80/443 conflict:** every proxy overlay in this repo binds the same host ports 80/443 -- **only one proxy can run at a time** (this proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same domain). The direct-mode ports do not conflict (Qwen-vLLM `1235`, Muse `1236`, Nemotron `1237`, Qwen-SGLang `1238`, Gemma 4 `1239`).
 
 ### 3. Get your API key
 
@@ -93,7 +93,7 @@ API authentication is **enabled by default** (`ENABLE_API_KEY=true`). On the fir
 docker compose logs | grep "Generated API key"
 ```
 
-Save this value — it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
+Save this value -- it will **not** be shown again on subsequent restarts. You can also retrieve it anytime:
 
 ```bash
 docker exec sglang-qwen-server cat /root/.sglang-key/.api_key
@@ -155,10 +155,10 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 | Variable | Default | Description |
 |---|---|---|
-| `MODEL_NAME` | `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` | HuggingFace model name — set in `.env` |
+| `MODEL_NAME` | `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` | HuggingFace model name -- set in `.env` |
 | `HF_CACHE_VOLUME` | `hf-cache-gittensor` | Named volume for the HF cache |
 | `KV_CACHE_DTYPE` | `fp8_e4m3` | KV cache data type |
-| `MEM_FRACTION_STATIC` | `0.85` | Fraction of usable VRAM (0.0–1.0). Deviates from the model card (0.90): 0.85 is the zero-UVM-spill tuning for the WDDM/WSL2 target platform |
+| `MEM_FRACTION_STATIC` | `0.85` | Fraction of usable VRAM (0.0-1.0). Deviates from the model card (0.90): 0.85 is the zero-UVM-spill tuning for the WDDM/WSL2 target platform |
 | `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this checkpoint (no custom HF modeling code ships with it); set `true` only if the model gains a `modeling_*.py` / `auto_map` |
 | `HF_TOKEN` | *(from `.env`)* | HuggingFace token |
 
@@ -168,7 +168,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 |---|---|---|
 | `ATTENTION_BACKEND` | `flashinfer` | Attention backend |
 | `MAX_RUNNING_REQUESTS` | `2` | Maximum concurrent requests |
-| `CONTEXT_LENGTH` | `262144` | Context length (architecture ceiling — the effective per-request window is `min(CONTEXT_LENGTH, KV pool)`; the pool is what you can tune via `MEM_FRACTION_STATIC`) |
+| `CONTEXT_LENGTH` | `262144` | Context length (architecture ceiling -- the effective per-request window is `min(CONTEXT_LENGTH, KV pool)`; the pool is what you can tune via `MEM_FRACTION_STATIC`) |
 | `CHUNKED_PREFILL_SIZE` | `1024` | Chunked prefill size (model card: `2048`; `1024` is the WDDM/WSL2 low-spill tuning) |
 | `MAX_MAMBA_CACHE_SIZE` | `12` | Maximum Mamba cache entries |
 
@@ -192,16 +192,16 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ### Optional: vLLM-Copilot budget
 
-vLLM-Copilot is an **optional** VS Code client for this stack — the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: they keep the Output Length picker and the input window inside the measured ~129.6K KV pool (worst case `67584 + 32768 = 100.4K`), so the client neither 400s the request nor triggers a silent `--allow-auto-truncate` prompt cut.
+vLLM-Copilot is an **optional** VS Code client for this stack -- the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: they keep the Output Length picker and the input window inside the measured ~129.6K KV pool (worst case `67584 + 32768 = 100.4K`), so the client neither 400s the request nor triggers a silent `--allow-auto-truncate` prompt cut.
 
 Recommended model entry (`sglang/gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090`):
 
 | Parameter | Value | Rationale |
 |---|---|---|
-| `maxOutputTokens` | `[32768, 16384, 8192]` (array — Output Length picker, first value = default) | Effective per-request window is the measured KV pool (~129.6K tokens at `MEM_FRACTION_STATIC=0.85` on the WDDM/WSL2 target platform), not the 262K architecture ceiling. Default pick 32768 keeps the worst case `67584 + 32768 = 100.4K < 129.6K`. A 65536 pick would leave ~64K input headroom: enough for the base agent prompt (~30K), but multi-turn history can still exceed it and `--allow-auto-truncate` would then **silently truncate the prompt** — losing context with no error. |
-| `maxInputTokens` | `67584` | Pinned below the auto-computed `pool − 32768 = 96.8K`: `67584 + 32768 = 100.4K` stays under the measured pool with ~29.2K slack. |
+| `maxOutputTokens` | `[32768, 16384, 8192]` (array -- Output Length picker, first value = default) | Effective per-request window is the measured KV pool (~129.6K tokens at `MEM_FRACTION_STATIC=0.85` on the WDDM/WSL2 target platform), not the 262K architecture ceiling. Default pick 32768 keeps the worst case `67584 + 32768 = 100.4K < 129.6K`. A 65536 pick would leave ~64K input headroom: enough for the base agent prompt (~30K), but multi-turn history can still exceed it and `--allow-auto-truncate` would then **silently truncate the prompt** -- losing context with no error. |
+| `maxInputTokens` | `67584` | Pinned below the auto-computed `pool - 32768 = 96.8K`: `67584 + 32768 = 100.4K` stays under the measured pool with ~29.2K slack. |
 
-**Trade-off:** omitting the 65536 pick removes one-shot very long generation. To get it back, raise `MEM_FRACTION_STATIC` to 0.90 — on the WDDM/WSL2 target platform 0.90 causes UVM spill, 0.85 avoids it — or accept that a second concurrent request waits for KV release.
+**Trade-off:** omitting the 65536 pick removes one-shot very long generation. To get it back, raise `MEM_FRACTION_STATIC` to 0.90 -- on the WDDM/WSL2 target platform 0.90 causes UVM spill, 0.85 avoids it -- or accept that a second concurrent request waits for KV release.
 
 ### Template kwargs (per-request)
 
@@ -210,7 +210,7 @@ The model's chat template accepts these kwargs in the `chat_template_kwargs` fie
 | Kwargs | Default | Effect |
 |---|---|---|
 | `reasoning_effort` | `xhigh` | `xhigh` / `medium` / `low`. xhigh is the cheapest at equal accuracy (245 vs 584 reasoning tokens at 12/12 on the card's validation set). Invalid values raise. |
-| `enable_thinking` | `true` | `false` emits a closed, empty think block — use for short answers |
+| `enable_thinking` | `true` | `false` emits a closed, empty think block -- use for short answers |
 | `preserve_thinking` | `true` | Keeps reasoning in history; `false` is prefix-cache safe. For this stack's mamba prefix-cache (align blocks of 1600 tokens) keep it `false` so the prompt prefix stays stable across turns and multi-turn TTFT is preserved |
 | `tool_call_format` | `xml` | `json` switches to `{"name": ..., "arguments": {...}}` |
 | `continue_final_message` | `false` | Prefills the final assistant turn; takes precedence over `add_generation_prompt` |
@@ -233,16 +233,16 @@ The model's chat template accepts these kwargs in the `chat_template_kwargs` fie
 | Variable | Default | Description |
 |---|---|---|
 | `ENABLE_API_KEY` | `true` | API key authentication (auto-generates on first run) |
-| `VLLM_API_KEY` | *(empty → auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored — the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
+| `VLLM_API_KEY` | *(empty -> auto-generated)* | Pass-through: set a fixed key in `.env` (gitignored -- the one secret allowed there); if empty, the entrypoint generates and persists `sk-<uuid>` |
 | `PORT` | `30000` | In-container port (host mapping `1238:30000`) |
 
 ### Logging
 
 | Variable | Default | Description |
 |---|---|---|
-| `LOG_LEVEL` | `info` | Logger level (`--log-level`). The periodic `Decode batch … gen throughput` stats lines are INFO — set `warning` only if you do not need them |
+| `LOG_LEVEL` | `info` | Logger level (`--log-level`). The periodic `Decode batch ... gen throughput` stats lines are INFO -- set `warning` only if you do not need them |
 | `LOG_LEVEL_HTTP` | `warning` | HTTP server log level (`--log-level-http`); silences per-request access chatter (parity with the sibling vLLM stack's `--uvicorn-log-level warning`) |
-| `DECODE_LOG_INTERVAL` | `400` | Decode steps between throughput stats lines (SGLang default 40 ≈ 1 line/s; 400 ≈ 1 line every ~8s, close to the vLLM stats cadence) |
+| `DECODE_LOG_INTERVAL` | `400` | Decode steps between throughput stats lines (SGLang default 40 approx. 1 line/s; 400 approx. 1 line every ~8s, close to the vLLM stats cadence) |
 
 ### Runtime & low-level
 
@@ -262,23 +262,23 @@ The model's chat template accepts these kwargs in the `chat_template_kwargs` fie
 
 The nginx control set is identical to the sibling vLLM stacks (allowlist, rate limit, body cap, TLS). The engine is SGLang, not vLLM:
 
-**Why the allowlist is the main defense:** SGLang exposes a wider native surface than vLLM (`/generate`, `/get_model_info`, `/server_info`, `/v1/models`, `/metrics`, `/abort_request`, ...) and its `--api-key` key coverage is version-dependent. The allowlist keeps every non-`/v1` path blocked regardless of what the key covers — the clients use only the OpenAI-compatible `/v1/*` surface. **Probe at first activation:** with the server up, `GET /v1/models` and one non-`/v1` path (e.g. `/get_model_info`) without a key (expect 401/404) and confirm no client depends on a non-`/v1` path; if one does, extend the allowlist deliberately.
+**Why the allowlist is the main defense:** SGLang exposes a wider native surface than vLLM (`/generate`, `/get_model_info`, `/server_info`, `/v1/models`, `/metrics`, `/abort_request`, ...) and its `--api-key` key coverage is version-dependent. The allowlist keeps every non-`/v1` path blocked regardless of what the key covers -- the clients use only the OpenAI-compatible `/v1/*` surface. **Probe at first activation:** with the server up, `GET /v1/models` and one non-`/v1` path (e.g. `/get_model_info`) without a key (expect 401/404) and confirm no client depends on a non-`/v1` path; if one does, extend the allowlist deliberately.
 
 **Controls (nginx, HTTPS path):**
 
 | Control | Value | Purpose |
 |---|---|---|
-| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else → `404` | blocks the entire non-OpenAI native surface |
+| Endpoint allowlist | only `/v1/*` and `/health` are proxied, everything else -> `404` | blocks the entire non-OpenAI native surface |
 | Rate limit | 10 req/s per IP, burst 20, then `503` | bounds abuse and queue-flooding |
 | Body-size cap | `client_max_body_size 4m` | the full context window fits with margin; bounds abuse |
 | TLS | Mozilla Intermediate, HSTS, OCSP stapling | transport |
 
-**Controls (engine):** no `VLLM_MAX_N_SEQUENCES` equivalent in this stack — the engine is SGLang. Concurrency is bounded by `--max-running-requests` (`MAX_RUNNING_REQUESTS`).
+**Controls (engine):** no `VLLM_MAX_N_SEQUENCES` equivalent in this stack -- the engine is SGLang. Concurrency is bounded by `--max-running-requests` (`MAX_RUNNING_REQUESTS`).
 
 **Residual risks:**
 
-- Port `1238` stays published on the host in proxy mode (see known limitation above) — LAN-only exposure; the non-allowlisted native surface is reachable on 1238 with no nginx in front.
-- `LETSENCRYPT_DOMAIN` is shared with the qwen stack — only one of the two can hold the public 80/443 proxy at a time (see Notes).
+- Port `1238` stays published on the host in proxy mode (see known limitation above) -- LAN-only exposure; the non-allowlisted native surface is reachable on 1238 with no nginx in front.
+- `LETSENCRYPT_DOMAIN` is shared with the qwen stack -- only one of the two can hold the public 80/443 proxy at a time (see Notes).
 - `TRUST_REMOTE_CODE` defaults to `false`: this checkpoint ships no custom HF modeling code (no `modeling_*.py`, no `auto_map`), so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint later gains a `modeling_*.py`/`auto_map`; with `true` it becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Notes
@@ -288,20 +288,20 @@ The nginx control set is identical to the sibling vLLM stacks (allowlist, rate l
 - **DSpark v2:** enabled by default with the Gittensor drafter. It reaches the model-card profile of 161.7 tok/s on a dedicated 32 GB GPU; with speculation enabled the practical context window is about 165K tokens.
 - **VRAM:** with `MEM_FRACTION_STATIC=0.85` on 32 GB, the main model and approximately 1.4 GB drafter fit in the static budget.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts (named volume `hf-cache-gittensor`).
-- **Port:** the API is exposed on host port `1238` (mapped from internal port 30000), bound to `0.0.0.0` by default — reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
+- **Port:** the API is exposed on host port `1238` (mapped from internal port 30000), bound to `0.0.0.0` by default -- reachable from the LAN, not only localhost. It is Bearer-authenticated, but prefer the TLS proxy for non-local access.
 - **Reverse Proxy:** two modes via overlay:
-  - **Direct** (default): `docker compose up -d` → API on port `1238` (HTTP, LAN-reachable, Bearer-authenticated)
-  - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` → API on `https://<your-domain.duckdns.org>` (HTTPS, remote)
-  - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime — never hardcoded in config files.
-  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1238:30000` publish (Compose merges lists; an empty list is a no-op). Port `1238` stays published on the host even in proxy mode — LAN hosts can reach SGLang directly, bypassing the nginx allowlist (see Security posture).
-  - **80/443 exclusivity:** every proxy overlay in this repo binds the same host ports 80/443 — run **one** proxy at a time. This proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same `LETSENCRYPT_DOMAIN` (from each `.env`).
+  - **Direct** (default): `docker compose up -d` -> API on port `1238` (HTTP, LAN-reachable, Bearer-authenticated)
+  - **Proxy**: `docker compose -f docker-compose.yml -f docker-compose.proxy.yml up -d` -> API on `https://<your-domain.duckdns.org>` (HTTPS, remote)
+  - The proxy overlay adds 3 containers: `docker-gen` (required by acme-companion), `nginx` (reverse proxy with SSL), and `acme-companion` (Let's Encrypt cert management). Nginx generates a self-signed placeholder on first boot and symlinks to the Let's Encrypt cert once issued. The domain (`LETSENCRYPT_DOMAIN`) is resolved from `.env` at runtime -- never hardcoded in config files.
+  - **Known limitation:** the overlay's `ports: []` does NOT remove the base file's `1238:30000` publish (Compose merges lists; an empty list is a no-op). Port `1238` stays published on the host even in proxy mode -- LAN hosts can reach SGLang directly, bypassing the nginx allowlist (see Security posture).
+  - **80/443 exclusivity:** every proxy overlay in this repo binds the same host ports 80/443 -- run **one** proxy at a time. This proxy and the `vllm-qwen-3.8-27b-nvfp4` proxy additionally share the same `LETSENCRYPT_DOMAIN` (from each `.env`).
 - **DuckDNS:** register at [duckdns.org](https://www.duckdns.org), create a subdomain, and ensure it resolves to your public IP. Ports 80 and 443 must be forwarded from your router to the Docker host for Let's Encrypt validation. Set `LETSENCRYPT_DOMAIN` in `.env` to your DuckDNS subdomain.
 - **Let's Encrypt:** no separate registration required. The `acme-companion` container handles certificate issuance and renewal automatically. Provide `LETSENCRYPT_EMAIL` in `.env` for renewal notifications.
 
 ## Useful Commands
 
 ```bash
-# Start (direct mode — HTTP on port 1238, bound to 0.0.0.0)
+# Start (direct mode -- HTTP on port 1238, bound to 0.0.0.0)
 docker compose up -d
 
 # Start with HTTPS proxy (remote access via DuckDNS)
