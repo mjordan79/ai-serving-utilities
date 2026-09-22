@@ -5,7 +5,7 @@
 Docker Compose deployment for Qwen 27B NVFP4 on SGLang (OpenAI-compatible API).
 
 - **Model** -- `gittensor-model-hub/Qwen3.8-27B-NVFP4-RTX5090` (NVFP4, Mamba/hybrid attention)
-- **Image** -- `lmsysorg/sglang:v0.5.19-cu130` (stable release, see *Notes*)
+- **Image** -- `lmsysorg/sglang:v0.5.20` (stable release, see *Notes*)
 - **Speculative decoding** -- DSpark v2 drafter, enabled by default (set `SPECULATIVE_ALGORITHM=none` for full context)
 
 by Renato Perini (mjordan79)
@@ -283,7 +283,7 @@ The nginx control set is identical to the sibling vLLM stacks (allowlist, rate l
 
 ## Notes
 
-- **Image:** `lmsysorg/sglang:v0.5.19-cu130` is the stable multi-arch SGLang release (CUDA 13.0, amd64/arm64) that contains the DSpark NVFP4 drafter fix (PRs #34859 and #35496). The similarly named `nightly-cu134` tag is arm64-only and must not be used on the target amd64 platform.
+- **Image:** `lmsysorg/sglang:v0.5.20` is the stable multi-arch SGLang release (CUDA 13.0, amd64/arm64) that contains the DSpark NVFP4 drafter fix (PRs #34859 and #35496) and the Mamba + speculative-decode fixes (PRs #37165, #37836, #34820). The similarly named `nightly-cu134` tag is arm64-only and must not be used on the target amd64 platform.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `sglang-keys` volume at `/root/.sglang-key/.api_key`. Retrieve it with `docker exec sglang-qwen-server cat /root/.sglang-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
 - **DSpark v2:** enabled by default with the Gittensor drafter. It reaches the model-card profile of 161.7 tok/s on a dedicated 32 GB GPU; with speculation enabled the practical context window is about 165K tokens.
 - **VRAM:** with `MEM_FRACTION_STATIC=0.85` on 32 GB, the main model and approximately 1.4 GB drafter fit in the static budget.
