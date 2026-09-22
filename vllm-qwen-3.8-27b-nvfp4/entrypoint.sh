@@ -128,7 +128,7 @@ DEFAULT_PRESERVE_THINKING="${DEFAULT_PRESERVE_THINKING:-true}"
 # Loading
 SAFETENSORS_LOAD_STRATEGY="${SAFETENSORS_LOAD_STRATEGY:-prefetch}"
 SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-true}"
-# Default = Unsloth variant (compressed-tensors). NVIDIA variant: QUANTIZATION=modelopt in .env.
+# Default = Unsloth variant (compressed-tensors). NVIDIA variant: QUANTIZATION=modelopt_mixed in .env.
 QUANTIZATION="${QUANTIZATION:-compressed-tensors}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 

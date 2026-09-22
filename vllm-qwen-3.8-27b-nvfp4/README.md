@@ -39,9 +39,9 @@ MAX_MODEL_LEN=116800
 
 # Variant: NVIDIA -- NVFP4 via ModelOpt (comment the block above to use this)
 #MODEL_NAME=nvidia/Qwen3.8-27B-NVFP4
-#QUANTIZATION=modelopt
+#QUANTIZATION=modelopt_mixed
 #HF_CACHE_VOLUME=hf-cache-nvidia
-#MAX_MODEL_LEN=262144
+#MAX_MODEL_LEN=131072
 ```
 
 > The token must **never** be hardcoded in docker-compose or the entrypoint.
@@ -163,9 +163,9 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `MODEL_NAME` | `unsloth/Qwen3.8-27B-NVFP4` | HuggingFace model name -- set per variant in `.env` |
-| `QUANTIZATION` | `compressed-tensors` | Quantization backend -- `modelopt` for the NVIDIA variant |
+| `QUANTIZATION` | `compressed-tensors` | Quantization backend -- `modelopt_mixed` for the NVIDIA variant (on-disk `MIXED_PRECISION` scheme; the name is vLLM 0.30-only) |
 | `HF_CACHE_VOLUME` | `hf-cache-unsloth` | Named volume for the HF cache -- one per variant |
-| `MAX_MODEL_LEN` | `116800` | Maximum context length -- set per variant in `.env` (NVIDIA: `262144`, Unsloth: `116800`) |
+| `MAX_MODEL_LEN` | `116800` | Maximum context length -- set per variant in `.env` (NVIDIA: `131072`, Unsloth: `116800`). `262144` is the model's architecture ceiling (`max_position_embeddings`); the NVIDIA-variant KV pool on the 32 GB target (154,043 tokens @ `GPU_MEMORY_UTILIZATION=0.94`) is below that, so a full `262144` window is not served on the 32 GB target -- `131072` fits the pool |
 | `DTYPE` | `auto` | Data type for model weights |
 | `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Qwen3.8 is a built-in vLLM architecture and the compressed-tensors format is handled natively -- no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `SKIP_MM_PROFILING` | `true` | Skip multimodal profiling at startup |
@@ -235,7 +235,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 - **Variants:** `unsloth/Qwen3.8-27B-NVFP4` (Compressed-Tensors, default) and `nvidia/Qwen3.8-27B-NVFP4` (ModelOpt). To switch, edit the `MODEL_NAME` / `QUANTIZATION` / `HF_CACHE_VOLUME` / `MAX_MODEL_LEN` block in `.env` and run `docker compose up -d`. Each variant has its own HF cache volume, so the first run after a switch downloads that variant's weights.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-qwen-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
-- **MTP (Multi-Token Prediction):** the checkpoint ships one MTP layer (`mtp.layers.0`, 15 tensors in the weight index); vLLM 0.29.0 resolves it to the built-in `Qwen3_5MTP` draft model, so no separate draft checkpoint is needed. The entrypoint default is 3 speculative tokens per step (override with `MTP_NUM_SPECULATIVE_TOKENS`). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
+- **MTP (Multi-Token Prediction):** the checkpoint ships one MTP layer (`mtp.layers.0`, 15 tensors in the weight index); vLLM 0.30.0 resolves it to the built-in `Qwen3_5MTP` draft model, so no separate draft checkpoint is needed. The entrypoint default is 3 speculative tokens per step (override with `MTP_NUM_SPECULATIVE_TOKENS`). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
 - **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` field in each response: `none` omits it; `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`; vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.94` on 32 GB, consumption is ~30.1 GB.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
@@ -250,9 +250,9 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ## Security posture
 
-Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); endpoint claims verified against the running server (vLLM v0.29.0).
+Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); the unauthenticated-endpoint list below was probed live on this repo's vLLM stacks; re-probe it after each vLLM upgrade, as endpoint authentication can change between releases.
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in this version (and dev mode is never enabled).
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. The following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in the current image (and dev mode is never enabled).
 
 **Controls (nginx, HTTPS path):**
 

@@ -7,7 +7,7 @@
   <img src="https://img.shields.io/badge/Google%20Gemma-412991?style=flat-square&logo=google&logoColor=white" alt="Google Gemma">
 </a>
 <a href="https://github.com/vllm-project/vllm">
-  <img src="https://img.shields.io/badge/vLLM%20v0.29.0-4B8BBE?style=flat-square" alt="vLLM v0.29.0">
+  <img src="https://img.shields.io/badge/vLLM%20v0.30.0-4B8BBE?style=flat-square" alt="vLLM v0.30.0">
 </a>
 <a href="https://github.com/docker">
   <img src="https://img.shields.io/badge/Docker-EE5A24?style=flat-square" alt="Docker">
@@ -148,7 +148,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `MODEL_NAME` | `nvidia/Gemma-4-26B-A4B-NVFP4` | HuggingFace model name |
-| `QUANTIZATION` | `modelopt_fp4` | Quantization backend -- NVFP4 (W4A16) via the NVIDIA ModelOpt checkpoint format |
+| `QUANTIZATION` | `modelopt_fp4` | Quantization backend -- NVFP4 (W4A4) via the NVIDIA ModelOpt checkpoint format |
 | `HF_CACHE_VOLUME` | `hf-cache-gemma4` | Named volume for the HF cache |
 | `MAX_MODEL_LEN` | `131072` | Maximum context length |
 | `DTYPE` | `auto` | Data type for model weights |
@@ -205,7 +205,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | Variable | Default | Description |
 |---|---|---|
 | `VLLM_WSL2_ENABLE_PIN_MEMORY` | `1` | Hardcoded, WSL2 only: non-blocking per-step host->device staging of attention metadata; also required for the UVA / V2 model runner |
-| `VLLM_USE_V2_MODEL_RUNNER` | `1` | V2 model runner -- the GA default on vLLM 0.29, active without a pin; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` above enables its UVA path on the target WSL2 platform. Gemma 4's V2 + auto-select multimodal-prefix attention path is unvalidated end-to-end -- if boot or the first request fails on V2, add `- VLLM_USE_V2_MODEL_RUNNER=0` to the compose env (one-line fallback; V1 is the validated Gemma 4 path) and recreate the container |
+| `VLLM_USE_V2_MODEL_RUNNER` | `1` | V2 model runner -- the GA default on vLLM 0.30, active without a pin; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` above enables its UVA path on the target WSL2 platform. Gemma 4's V2 + auto-select multimodal-prefix attention path is unvalidated end-to-end -- if boot or the first request fails on V2, add `- VLLM_USE_V2_MODEL_RUNNER=0` to the compose env (one-line fallback; V1 is the validated Gemma 4 path) and recreate the container |
 | `SAFETENSORS_LOAD_STRATEGY` | `prefetch` | Weight loading strategy |
 | `VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS` | `1` | Estimate CUDA-graph memory in the profiler (on) |
 | `NVIDIA_VISIBLE_DEVICES` | `all` | GPU passthrough |
@@ -228,7 +228,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 ## Notes
 
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-gemma4-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
-- **MTP (Multi-Token Prediction):** the Gemma 4 checkpoint has no MTP layers -- the model config declares none (unlike the Nemotron 3.5 stack in this repo, whose checkpoint does). vLLM v0.29.0 accepts the `mtp` speculative method; on this model there is simply nothing to draft from. Keep `ENABLE_MTP=false`.
+- **MTP (Multi-Token Prediction):** the Gemma 4 checkpoint has no MTP layers -- the model config declares none (unlike the Nemotron 3.5 stack in this repo, whose checkpoint does). vLLM 0.30.0 accepts the `mtp` speculative method; on this model there is simply nothing to draft from. Keep `ENABLE_MTP=false`.
 - **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` response field: `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`. vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled -- in this stack MTP is off, so the variable must stay `none`.
 - **VRAM:** with `GPU_MEMORY_UTILIZATION=0.88` on 32 GB, the engine gets ~28.2 GB; this stack coexists with the live Qwen stack on the same card.
 - **HuggingFace Cache:** the cache is mounted at `/root/.cache/huggingface` and persists across container restarts.
@@ -247,7 +247,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 2. **Do not force `ATTENTION_BACKEND`:** the mm-prefix path needs a backend with `support_mm_prefix()`; FlashInfer does not. Leave `ATTENTION_BACKEND` empty (auto-select) and set a value only with a backend validated for this stack.
 3. **KV cache FP8 is unvalidated** for Gemma 4 on the target platform -- `KV_CACHE_DTYPE=auto`.
 4. **MTP:** the Gemma 4 checkpoint has no MTP layers; `ENABLE_MTP` must remain `false`.
-5. **transformers:** no pin -- vLLM v0.29.0 handles the Gemma 4 hybrid config natively. If a "heterogeneous config" error reproduces, add `RUN pip install "transformers<5.15"` to the Dockerfile and rebuild.
+5. **transformers:** no pin -- vLLM 0.30.0 handles the Gemma 4 hybrid config natively. If a "heterogeneous config" error reproduces, add `RUN pip install "transformers<5.15"` to the Dockerfile and rebuild.
 
 ## VRAM escalation ladder
 
@@ -276,9 +276,9 @@ In VS Code `settings.json`, under `vllm-copilot`, add:
 
 ## Security posture
 
-Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); endpoint claims verified against the running server (vLLM v0.29.0).
+Hardened against the [vLLM security docs](https://docs.vllm.ai/en/latest/usage/security/); the unauthenticated-endpoint list below was probed live on this repo's vLLM stacks; re-probe it after each vLLM upgrade, as endpoint authentication can change between releases.
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in this version (and dev mode is never enabled).
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. The following endpoints answer **without credentials** (probed live): `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`. `/pause`, `/abort_requests`, the dev-mode and weight-update endpoints do not exist in the current image (and dev mode is never enabled).
 
 **Controls (nginx, HTTPS path):**
 

@@ -35,18 +35,19 @@ services:
       - VLLM_MEMORY_PROFILER_ESTIMATE_CUDAGRAPHS
       - VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR
 
-      # WSL2 only: Enables non-blocking per-step host -> device
-      # staging of attention metadata. Also required for UVA / V2 model runner.
+      # WSL2 only: Enables non-blocking per-step host -> device staging of
+      # attention metadata for the V2 model runner's UVA path. In-image
+      # default: off.
       - VLLM_WSL2_ENABLE_PIN_MEMORY=1
 
-      # V2 model runner is the GA default on vLLM 0.29 (no pin needed); the
-      # VLLM_WSL2_ENABLE_PIN_MEMORY=1 above enables its UVA path on WSL2. Gemma 4's
-      # V2 + auto-select mm-prefix attention path is unvalidated on the target
-      # platform; if boot or the first request fails on V2, add
+      # The V2 model runner is the GA default on vLLM 0.30 (auto-enabled on
+      # CUDA + Triton; Gemma 4 uses no V2-unsupported feature). Gemma 4's
+      # V2 + auto-select mm-prefix attention path is unvalidated on the
+      # target platform; if boot or the first request fails on V2, add
       # `- VLLM_USE_V2_MODEL_RUNNER=0` and restart (one-line fallback — V1 is the
       # validated Gemma 4 path).
 
-      # Shared-GPU safe budget: this stack coexists with the live qwen stack
+      # Shared-GPU safe budget: this stack coexists with the live stack
       # on the same 32 GB card. Raise to 0.92-0.94 when the GPU is exclusive.
       - GPU_MEMORY_UTILIZATION=0.88
 

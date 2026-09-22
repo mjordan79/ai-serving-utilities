@@ -6,7 +6,7 @@ checkpoint (ModelOpt NVFP4 W4A16) from HuggingFace.
 - **Producer:** NVIDIA -- **Publisher:** NVIDIA
 - **Architecture:** hybrid Mamba (SSM) + MoE attention -- 30B total parameters, ~3B active per token. Because of the hybrid layout the stack pins the V2 model runner explicitly (see *Known issues*) and applies Mamba-cache flags that a plain dense model would not use.
 - **Model ID:** `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` (~18 GB download)
-- **Base image:** `vllm/vllm-openai:v0.29.0` (current stable vLLM release; the official deployment recipe's minimum for this model is v0.27.1)
+- **Base image:** `vllm/vllm-openai:v0.30.0` (current stable vLLM release). The default `modelopt_mixed` quantization flag is vLLM 0.30-only, so this stack's minimum is v0.30.0
 - **vLLM flags:** base-recipe args (flashinfer Mamba backend, `align` cache mode, prefix caching) + NVFP4 variant (fp8 KV cache, MoE kernel auto-selected per model part: MARLIN for the quantized main model, a triton-family backend for the unquantized MTP draft MoE) + built-in MTP speculative decoding (3 speculative tokens per step). Hopper-only overrides are exposed but **off by default** (see *Hopper-only overrides*): this repo targets an RTX 5090 (sm_120), which the recipe does not list.
 - **Local endpoint:** `http://localhost:1237` -- container `vllm-nemotron-server`
 - **Reverse proxy (optional):** `docker-compose.proxy.yml` on DuckDNS (`your-domain.duckdns.org`) -- see *Reverse Proxy (optional)*. Only one stack may hold ports 80/443 at a time (Qwen on 1235, Muse on 1236, this stack on 1237, Qwen-SGLang on 1238, Gemma 4 on 1239).
@@ -98,10 +98,10 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | Variable | Default | Description |
 |---|---|---|
 | `MODEL_NAME` | `nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4` | HuggingFace model ID |
-| `QUANTIZATION` | `modelopt_fp4` | Quantization method. Leave empty to let vLLM auto-detect from the checkpoint config |
+| `QUANTIZATION` | `modelopt_mixed` | Quantization method matching the checkpoint's on-disk `MIXED_PRECISION` quant algo (FP8 dense layers + NVFP4 W4A16 MoE experts); the name is vLLM 0.30-only. Leave empty to let vLLM auto-detect from the checkpoint config |
 | `HF_CACHE_VOLUME` | `hf-cache-nemotron` | Named volume holding the HuggingFace cache (checkpoint + weights) |
 | `VLLM_FLASHINFER_AUTOTUNE_CACHE_DIR` | `/vllm-cache/flashinfer_autotune` | FlashInfer kernel autotune cache, persisted in the `vllm-flashinfer-cache` volume. vLLM's default (`/tmp`) is wiped on container recreation and costs a ~15-30 s re-autotune at every boot |
-| `MAX_MODEL_LEN` | `65536` | Maximum context length (tokens). Must hold prompt + output together: vLLM hard-rejects any request with `prompt + max_tokens > MAX_MODEL_LEN`. Agent IDE prompts (instruction files, MCP schemas, editor context) run ~29.5K tokens, so `29.5K prompt + 32K output = 61.5K < 65.5K` fits. Cost: at 64K the KV cache holds ~8 concurrent sequences vs ~16 at 32K -- irrelevant for single-user interactive serving; drop back to `32768` if raw concurrency matters |
+| `MAX_MODEL_LEN` | `32768` | Maximum context length (tokens). Must hold prompt + output together: vLLM hard-rejects any request with `prompt + max_tokens > MAX_MODEL_LEN`. Agent IDE prompts run ~29.5K tokens, so `29.5K prompt + 2K output = 31.5K < 32.8K` fits; the 32K-output profile needs `65536` (`29.5K + 32K = 61.5K < 65.5K`). The validated 782,687-token KV pool serves ~23 full-window sequences at `32768`, ~11 at `65536` |
 | `DTYPE` | `auto` | Data type (`auto`, `bfloat16`, `float16`) |
 | `TP_SIZE` | `1` | Tensor parallelism size |
 | `ATTENTION_BACKEND` | *(empty)* | Attention backend. Leave empty to let vLLM auto-select; forcing one is not advised on this hybrid architecture (validated failure mode on the Gemma post-mortem) |
@@ -126,7 +126,7 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `ASYNC_SCHEDULING` | *(empty)* | **Hopper-only.** Async scheduling; set on H100/H200 only |
 | `ENABLE_MTP` | `true` | MTP (multi-token prediction) speculative decoding -- built into the checkpoint |
 | `MTP_NUM_SPECULATIVE_TOKENS` | `3` | Speculative tokens per step (recipe Blackwell value) |
-| `MTP_MOE_BACKEND` | `triton` | Emits a `"moe_backend"` key into the speculative-config JSON; empty omits the key. On 0.29.0 this key is not honored on the unquantized MTP-draft path -- the draft MoE backend follows the global `MOE_BACKEND` selection (empty -> vLLM oracle auto-selects) |
+| `MTP_MOE_BACKEND` | `triton` | Emits a `"moe_backend"` key into the speculative-config JSON; empty omits the key. On vLLM 0.30 this key is honored: it pins the unquantized MTP-draft model's MoE kernel; when omitted the draft inherits the target's global `MOE_BACKEND` selection (empty -> vLLM oracle auto-selects) |
 | `PER_REQUEST_SPEC_DECODE_METRICS` | `none` | Per-request spec-decode acceptance metrics in the response (`metrics.speculative_decoding`): `none` off \| `summary` \| `detailed` |
 | `REASONING_PARSER` | `nemotron_v3` | Reasoning (thinking) block parser (recipe feature) |
 | `ENABLE_AUTO_TOOL_CHOICE` | `true` | Enable automatic tool choice |
@@ -134,21 +134,21 @@ Tuning flags are set in `entrypoint.sh` (defaults) and overridden via `docker-co
 | `ENABLE_PROMPT_TOKENS_DETAILS` | `true` | Prompt tokens details in responses |
 | `ENABLE_REQUEST_METRICS` | `false` | Per-request metrics (requires `DISABLE_LOG_STATS=false`) |
 | `DISABLE_LOG_STATS` | `true` | Disable periodic log stats |
-| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Nemotron 3.5 is a built-in vLLM architecture and the NVFP4 checkpoint is handled natively via `modelopt_fp4` -- no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
+| `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Nemotron 3.5 is a built-in vLLM architecture and the NVFP4 checkpoint is handled natively via `modelopt_mixed` -- no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `EXTRA_ARGS_STR` | *(empty)* | Raw extra flags appended verbatim to `vllm serve` (escape hatch, e.g. `--num-gpu-workers 1`) |
 | `PORT` | `8000` | Container port |
 | `HF_TOKEN` | -- | HuggingFace token (gated checkpoint) |
 
 ### Optional: vLLM-Copilot budget
 
-vLLM-Copilot is an **optional** VS Code client for this stack -- the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: ~29.5K-token agent prompts plus a 32K output budget fit the 64K window, so vLLM never 400s the request.
+vLLM-Copilot is an **optional** VS Code client for this stack -- the server needs no client-side tuning and serves any OpenAI-compatible consumer out of the box. The parameters below are the recommended entry if you use the extension: agent prompts run ~29.5K tokens, so a 2K output budget fits the 32K window and vLLM never 400s the request. A 32K output budget requires `MAX_MODEL_LEN=65536`.
 
 Recommended model entry (`vllm/nvidia/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-NVFP4`):
 
 | Parameter | Value | Rationale |
 |---|---|---|
-| `maxOutputTokens` | `32768` | `MAX_MODEL_LEN=65536`: agent prompts run ~29.5K tokens, so `29.5K + 32K = 61.5K < 65.5K` fits without a deterministic 400 (vLLM hard-rejects `prompt + max_tokens > MAX_MODEL_LEN`). A `max_tokens` above `MAX_MODEL_LEN` is unsatisfiable. |
-| `maxInputTokens` | *(unset)* | Auto-computed as `65536 - 32768 = 32768`. |
+| `maxOutputTokens` | `2048` | `MAX_MODEL_LEN=32768`: agent prompts run ~29.5K tokens, so `29.5K + 2K = 31.5K < 32.8K` fits without a deterministic 400 (vLLM hard-rejects `prompt + max_tokens > MAX_MODEL_LEN`). A `max_tokens` of `32768` is unsatisfiable on the 32K window; the 32K-output profile needs `MAX_MODEL_LEN=65536` |
+| `maxInputTokens` | *(unset)* | Auto-computed as `32768 - 2048 = 30720`. |
 | `defaultParams` | `{ temperature: 1, top_p: 0.95 }` | Matches the checkpoint's sampling profile (already present in the entry). |
 
 ### Hopper-only overrides
@@ -165,7 +165,7 @@ MAX_NUM_BATCHED_TOKENS=32768
 
 ### Speculative decoding
 
-MTP is on by default (`ENABLE_MTP=true`, 3 speculative tokens per step). The MTP block -- one attention layer plus one MoE layer (`num_nextn_predict_layers: 1`, 270 MTP tensors in the weight index) -- is built into the checkpoint, so no separate draft model is needed. The draft's MoE kernel follows the global `MOE_BACKEND` selection: empty lets the vLLM oracle auto-select a supported backend per model part (triton-family for the unquantized draft). If MTP misbehaves on the target GPU, set `ENABLE_MTP=false`.
+MTP is on by default (`ENABLE_MTP=true`, 3 speculative tokens per step). The MTP block -- one attention layer plus one MoE layer (`num_nextn_predict_layers: 1`, 270 MTP tensors in the weight index) -- is built into the checkpoint, so no separate draft model is needed. The draft's MoE kernel is pinned by the `MTP_MOE_BACKEND` speculative-config key (default `triton`); when the key is omitted, the draft inherits the target's global `MOE_BACKEND` selection (empty -> the vLLM oracle auto-selects a supported backend per model part). If MTP misbehaves on the target GPU, set `ENABLE_MTP=false`.
 
 **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` response field: `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`; vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled.
 
@@ -183,16 +183,16 @@ If it starts but dies under load, apply the same three dials in the same order.
 
 ## Known issues
 
-- **Model runner:** `VLLM_USE_V2_MODEL_RUNNER=1` is explicitly pinned in `docker-compose.yml` -- the V2 model runner is the GA default on vLLM 0.29, so the pin is redundant but kept as a one-line rollback surface; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` (also in the compose) enables the V2 UVA path on the target WSL2 platform. If V2 fails to boot or on the first request, set `VLLM_USE_V2_MODEL_RUNNER=0` to fall back to the V1 runner and recreate the container.
+- **Model runner:** `VLLM_USE_V2_MODEL_RUNNER=1` is explicitly pinned in `docker-compose.yml` -- the V2 model runner is the GA default on vLLM 0.30, so the pin is redundant but kept as a one-line rollback surface; `VLLM_WSL2_ENABLE_PIN_MEMORY=1` (also in the compose) enables the V2 UVA path on the target WSL2 platform. If V2 fails to boot or on the first request, set `VLLM_USE_V2_MODEL_RUNNER=0` to fall back to the V1 runner and recreate the container.
 - **Do not force `ATTENTION_BACKEND`:** forcing a backend on this hybrid architecture is a validated crash mode (Gemma post-mortem). Leave it empty; vLLM auto-selects.
 - **`MAMBA_BACKEND=flashinfer` on sm_120:** the recipe pins flashinfer for the Mamba backend; if it fails to initialize on sm_120, fall back to `MAMBA_BACKEND=triton` in `.env`.
-- **`MAX_MODEL_LEN`:** the live `.env` sets `MAX_MODEL_LEN=auto` (the `.env.example` ships `32768`); the effective context is whatever fits the KV pool budget at boot -- confirm the resolved value in the boot log.
+- **`MAX_MODEL_LEN`:** the shipping value is `32768` (`.env.example` and entrypoint fallback); the boot log is the source of truth for the resolved window and KV pool size. The validated 0.30 boot reports a 32,768-token window with a 782,687-token KV pool.
 
 ## Security posture
 
-Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.29.0**; the unauthenticated-endpoint list below applies to v0.29.0.
+Same nginx control set as the sibling vLLM stacks. The unauthenticated-endpoint list below was probed live on this repo's vLLM stacks; re-probe it after each vLLM upgrade, as endpoint authentication can change between releases.
 
-**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. On v0.29.0 the following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
+**What `--api-key` does not protect:** the key only authenticates `/v1`, `/v2` and `/inference`. The following endpoints answer **without credentials**: `/invocations` (SageMaker-compatible inference -- a full auth bypass), `/generative_scoring`, `/tokenize`, `/detokenize`, `/scale_elastic_ep`, `/is_scaling_elastic_ep`, `/ping`, `/version`, `/metrics`, `/load`.
 
 **Controls (nginx, HTTPS path):**
 
@@ -208,7 +208,7 @@ Same nginx control set as the sibling vLLM stacks. This stack runs **vLLM v0.29.
 **Residual risks:**
 
 - Port `1237` stays published on the host in proxy mode (the overlay's `ports: []` is a no-op -- Compose merges lists, as documented in the qwen stack) -- LAN-only exposure. The unauthenticated endpoints listed above are reachable on 1237 with no nginx in front.
-- `TRUST_REMOTE_CODE` defaults to `false`: Nemotron 3.5 loads through vLLM's built-in architecture registry and its NVFP4 weights are consumed natively via `modelopt_fp4`, so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint starts failing with a custom-code / `auto_map` load error; with `true` the flag becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
+- `TRUST_REMOTE_CODE` defaults to `false`: Nemotron 3.5 loads through vLLM's built-in architecture registry and its NVFP4 weights are consumed natively via `modelopt_mixed`, so no remote-code surface is exposed at load. Set `TRUST_REMOTE_CODE=true` only if the checkpoint starts failing with a custom-code / `auto_map` load error; with `true` the flag becomes a supply-chain trust in the Hugging Face repo, not a runtime API surface.
 
 ## Useful commands
 

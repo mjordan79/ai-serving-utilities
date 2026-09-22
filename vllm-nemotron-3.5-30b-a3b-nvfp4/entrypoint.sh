@@ -88,7 +88,7 @@ TP_SIZE="${TP_SIZE:-1}"
 # 0.94: the RTX 5090 is dedicated to this stack — raising utilization buys
 # materially more KV headroom.
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.94}"
-MAX_MODEL_LEN="${MAX_MODEL_LEN:-65536}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-32768}"
 KV_CACHE_DTYPE="${KV_CACHE_DTYPE:-fp8_e4m3}"
 
 # Throughput — conservative first-boot values.
@@ -135,9 +135,10 @@ ENABLE_MTP="${ENABLE_MTP:-true}"
 MTP_NUM_SPECULATIVE_TOKENS="${MTP_NUM_SPECULATIVE_TOKENS:-3}"
 # Emits a "moe_backend" key into the MTP speculative config JSON (recipe: triton).
 # Empty string omits the key from the JSON entirely.
-# On 0.29.0 this key is not honored on the unquantized MTP-draft path: the
-# draft's MoE kernel follows the global MOE_BACKEND selection instead
-# (empty -> the vLLM oracle auto-selects a supported backend per model part).
+# On vLLM 0.30 this key IS honored: it pins the unquantized MTP-draft
+# model's MoE kernel. When omitted, the draft inherits the target's global
+# --moe-backend (empty -> the vLLM oracle auto-selects a supported backend
+# per model part).
 MTP_MOE_BACKEND="${MTP_MOE_BACKEND:-triton}"
 # Per-request speculative-decoding acceptance metrics in the response body
 # (metrics.speculative_decoding): none | summary | detailed. vLLM refuses to
@@ -160,9 +161,14 @@ TOOL_CALL_PARSER="${TOOL_CALL_PARSER:-qwen3_coder}"
 # Loading
 SAFETENSORS_LOAD_STRATEGY="${SAFETENSORS_LOAD_STRATEGY:-prefetch}"
 SKIP_MM_PROFILING="${SKIP_MM_PROFILING:-true}"
-# ModelOpt NVFP4 (W4A16). Empty string omits the flag — vLLM auto-detects
-# from the checkpoint's quantization_config if the flag is ever rejected.
-QUANTIZATION="${QUANTIZATION:-modelopt_fp4}"
+# ModelOpt quantization: the checkpoint's on-disk quant_algo is
+# MIXED_PRECISION (FP8 dense layers + NVFP4 W4A16 MoE experts). The vLLM
+# 0.30 modelopt override chain maps that checkpoint unconditionally to the
+# `modelopt_mixed` config class; any other modelopt pin is silently
+# redirected to it. This name requires vLLM 0.30+. Empty string omits the
+# flag — vLLM auto-detects from the checkpoint's quantization_config if the
+# flag is ever rejected.
+QUANTIZATION="${QUANTIZATION:-modelopt_mixed}"
 TRUST_REMOTE_CODE="${TRUST_REMOTE_CODE:-false}"
 
 # API
