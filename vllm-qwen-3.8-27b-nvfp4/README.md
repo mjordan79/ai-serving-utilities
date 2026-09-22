@@ -5,7 +5,7 @@
 Docker Compose deployment for Qwen 27B NVFP4 on vLLM (OpenAI-compatible API). The same deployment serves two HuggingFace checkpoints, selected in `.env`:
 
 - **Unsloth** -- `unsloth/Qwen3.8-27B-NVFP4`, NVFP4 via Compressed-Tensors (default)
-- **NVIDIA** -- `nvidia/Qwen3.6-27B-NVFP4`, NVFP4 via ModelOpt
+- **NVIDIA** -- `nvidia/Qwen3.8-27B-NVFP4`, NVFP4 via ModelOpt
 
 by Renato Perini (mjordan79)
 
@@ -38,10 +38,10 @@ HF_CACHE_VOLUME=hf-cache-unsloth
 MAX_MODEL_LEN=116800
 
 # Variant: NVIDIA -- NVFP4 via ModelOpt (comment the block above to use this)
-#MODEL_NAME=nvidia/Qwen3.6-27B-NVFP4
+#MODEL_NAME=nvidia/Qwen3.8-27B-NVFP4
 #QUANTIZATION=modelopt
 #HF_CACHE_VOLUME=hf-cache-nvidia
-#MAX_MODEL_LEN=131072
+#MAX_MODEL_LEN=262144
 ```
 
 > The token must **never** be hardcoded in docker-compose or the entrypoint.
@@ -165,7 +165,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 | `MODEL_NAME` | `unsloth/Qwen3.8-27B-NVFP4` | HuggingFace model name -- set per variant in `.env` |
 | `QUANTIZATION` | `compressed-tensors` | Quantization backend -- `modelopt` for the NVIDIA variant |
 | `HF_CACHE_VOLUME` | `hf-cache-unsloth` | Named volume for the HF cache -- one per variant |
-| `MAX_MODEL_LEN` | `116800` | Maximum context length -- set per variant in `.env` (NVIDIA: `131072`, Unsloth: `116800`) |
+| `MAX_MODEL_LEN` | `116800` | Maximum context length -- set per variant in `.env` (NVIDIA: `262144`, Unsloth: `116800`) |
 | `DTYPE` | `auto` | Data type for model weights |
 | `TRUST_REMOTE_CODE` | `false` | Pass `--trust-remote-code`. `false` for this stack (Qwen3.8 is a built-in vLLM architecture and the compressed-tensors format is handled natively -- no custom HF modeling code expected); set `true` only if the checkpoint fails to load with a `--trust-remote-code` error |
 | `SKIP_MM_PROFILING` | `true` | Skip multimodal profiling at startup |
@@ -233,7 +233,7 @@ All parameters are in `docker-compose.yml` under `environment` (values marked *f
 
 ## Notes
 
-- **Variants:** `unsloth/Qwen3.8-27B-NVFP4` (Compressed-Tensors, default) and `nvidia/Qwen3.6-27B-NVFP4` (ModelOpt). To switch, edit the `MODEL_NAME` / `QUANTIZATION` / `HF_CACHE_VOLUME` / `MAX_MODEL_LEN` block in `.env` and run `docker compose up -d`. Each variant has its own HF cache volume, so the first run after a switch downloads that variant's weights.
+- **Variants:** `unsloth/Qwen3.8-27B-NVFP4` (Compressed-Tensors, default) and `nvidia/Qwen3.8-27B-NVFP4` (ModelOpt). To switch, edit the `MODEL_NAME` / `QUANTIZATION` / `HF_CACHE_VOLUME` / `MAX_MODEL_LEN` block in `.env` and run `docker compose up -d`. Each variant has its own HF cache volume, so the first run after a switch downloads that variant's weights.
 - **API Key:** enabled by default (`ENABLE_API_KEY=true`). An `sk-<uuid>` is auto-generated on first run and saved to the `vllm-keys` volume at `/root/.vllm-key/.api_key`. Retrieve it with `docker exec vllm-qwen-server cat /root/.vllm-key/.api_key`. To use a fixed key, set `VLLM_API_KEY` in `.env` (gitignored; compose passes it through and the entrypoint uses it instead of generating one). To disable, change `- ENABLE_API_KEY` to `- ENABLE_API_KEY=false` in `docker-compose.yml`.
 - **MTP (Multi-Token Prediction):** the checkpoint ships one MTP layer (`mtp.layers.0`, 15 tensors in the weight index); vLLM 0.29.0 resolves it to the built-in `Qwen3_5MTP` draft model, so no separate draft checkpoint is needed. The entrypoint default is 3 speculative tokens per step (override with `MTP_NUM_SPECULATIVE_TOKENS`). If you get missing MTP weights errors on first startup, set `ENABLE_MTP=false` and restart.
 - **Per-request spec-decode metrics:** `PER_REQUEST_SPEC_DECODE_METRICS` (default `none`) controls the experimental `metrics.speculative_decoding` field in each response: `none` omits it; `summary` adds mean acceptance length, draft acceptance rate and a step-by-draft-length histogram; `detailed` additionally records the ordered per-step accepted/proposed arrays. Reported only for single-sequence requests (`n=1`); independent of `DISABLE_LOG_STATS`; vLLM refuses to start if set to a non-`none` value while speculative decoding is disabled.
